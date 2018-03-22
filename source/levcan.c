@@ -43,9 +43,9 @@ typedef struct {
 	uint16_t Time_since_comm;
 	uint8_t Attempt;
 	struct {
-		unsigned TCP:1;
-		unsigned TXcleanup:1;
-	}Flags;
+		unsigned TCP :1;
+		unsigned TXcleanup :1;
+	} Flags;
 	intptr_t* Next;
 	intptr_t* Previous;
 } objBuffered;
@@ -712,7 +712,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 			//TX finished? delete this buffer anyway
 			trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
 			//cleanup tx buffer also
-			if(object->Flags.TXcleanup)
+			if (object->Flags.TXcleanup)
 				vPortFree(object->Pointer);
 			//delete object from memory chain, find new endings
 			deleteObject(object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
@@ -777,7 +777,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 	} while ((object->Flags.TCP == 0) && (getTXqueueSize() * 3 < LEVCAN_TX_SIZE * 4) && (object->Header.EoM == 0));
 	//in UDP mode delete object when EoM is set
 	if ((object->Flags.TCP == 0) && (object->Header.EoM == 1)) {
-		if(object->Flags.TXcleanup)
+		if (object->Flags.TXcleanup)
 			vPortFree(object->Pointer);
 		deleteObject(object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
 		trace_printf("TX UDP finished:%d\n", object->Header.MsgID);
@@ -904,7 +904,7 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 	LC_ObjectRecord_t* record;
 	if (node == 0)
 		return rec;
-	for (int source = 0; source < 1; source++) {
+	for (int source = 0; source < 2; source++) {
 		int32_t objsize;
 		LC_Object_t* objectArray;
 		//switch between system objects and external
@@ -937,7 +937,7 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 					//scroll through all LC_ObjectRecord_t[]
 					for (int irec = 0; irec < objectArray[i].Size; irec++) {
 						//if size<0 - any length accepted up to specified abs(size), check r/w access and id
-						if (((size == record[irec].Size) || (record[irec].Size < 0))
+						if (((size == record[irec].Size) || (record[irec].Size < 0) || (read_write == Read && size == 0))
 								&& ((record[irec].Attributes.Readable != read_write) || (record[irec].Attributes.Writable == read_write))
 								&& (/*(nodeID == LC_Broadcast_Address) ||*/(record[irec].NodeID == LC_Broadcast_Address) || (record[irec].NodeID == nodeID)))
 							return record[irec]; //yes
@@ -946,7 +946,9 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 					}
 				} else {
 					//if size<0 - any length accepted up to specified abs(size), check r/w access and id
-					if (((size == rec.Size) || (rec.Size < 0)) && ((rec.Attributes.Readable != read_write) || (rec.Attributes.Writable == read_write))
+					//for request size 0 - any object
+					if (((size == rec.Size) || (rec.Size < 0) || (read_write == Read && size == 0))
+							&& ((rec.Attributes.Readable != read_write) || (rec.Attributes.Writable == read_write))
 							&& (/*(nodeID == LC_Broadcast_Address) ||*/(rec.NodeID == LC_Broadcast_Address) || (rec.NodeID == nodeID)))
 						return rec;
 					else
