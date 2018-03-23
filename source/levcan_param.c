@@ -485,9 +485,8 @@ void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_nod
 
 void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, int full) {
 	LC_NodeDescription_t* node = sender_node;
-	if (node == 0)
-		node = &own_nodes[0];
-	if (node->State != LCNodeState_Online)
+
+	if (node == 0 || node->State != LCNodeState_Online)
 		return;
 	bufferedParam_t* receive = findFreeRx();
 	if (receive == 0)
