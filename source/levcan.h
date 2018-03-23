@@ -4,16 +4,11 @@
  *      Author: Vasiliy Sukhoparov (VasiliSk)
  */
 #include "stdint.h"
+/* Application specific configuration options. */
+#include "levcan_config.h"
 #include "levcan_param.h"
 
 #pragma once
-
-#define LC_MAX_OWN_NODES 2
-#define LC_MAX_TABLE_NODES 2
-#define LEVCAN_TX_SIZE 20
-#define LEVCAN_RX_SIZE 20
-#define LC_ObjAttrib_PriorityShift 6
-
 
 typedef union {
 	uint16_t Attributes;
@@ -99,13 +94,16 @@ enum {
 	LC_SYS_NodeName = 0x388,
 	LC_SYS_DeviceName,
 	LC_SYS_VendorName,
-	LC_SYS_SerialNumber,
 	LC_SYS_VendorCode,
+	LC_SYS_HWVersion,
+	LC_SYS_SWVersion,
+	LC_SYS_SerialNumber,
 	LC_SYS_Parameters,
 	LC_SYS_Variables,
 	LC_SYS_Events,
 	LC_SYS_FWUpdate,
 	LC_SYS_Trace,
+	LC_SYS_DateTime,
 	LC_SYS_End,
 };
 

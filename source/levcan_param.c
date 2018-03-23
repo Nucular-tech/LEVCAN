@@ -13,8 +13,8 @@
 #include <stdlib.h>
 #include <math.h>
 
-extern void *pvPortMalloc(uint32_t xWantedSize);
-extern void vPortFree(void *pv);
+extern void *lcmalloc(uint32_t xWantedSize);
+extern void lcfree(void *pv);
 
 typedef struct {
 	int32_t Value;
@@ -51,8 +51,7 @@ int setParameterValue(const LC_ParameterAdress_t* parameter, int32_t value);
 char* printParam(const LC_ParameterAdress_t* parameter);
 bufferedParam_t* findFreeRx(void);
 
-#define prx_size 10
-bufferedParam_t receive_buffer[prx_size];
+bufferedParam_t receive_buffer[LEVCAN_PARAM_QUEUE_SIZE];
 volatile int16_t receive_free;
 
 char* extractName(const LC_ParameterAdress_t* param) {
@@ -74,7 +73,7 @@ char* extractName(const LC_ParameterAdress_t* param) {
 parameterValuePacked_t param_invalid = { .Index = 0, .Directory = 0, .ReadType = RT_invalid, .Literals = { 0, 0 } };
 
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
-	for (int i = 0; i < prx_size; i++) {
+	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
 		if (receive_buffer[i].Param != 0 && receive_buffer[i].Directory == dir && receive_buffer[i].Param->Index == index && receive_buffer[i].Source == source)
 			return &receive_buffer[i];
 	}
@@ -283,10 +282,10 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 
 bufferedParam_t* findFreeRx(void) {
 	int position = receive_free;
-	for (int i = 0; i < prx_size; i++) {
-		if (receive_buffer[(i + position) % prx_size].Param == 0) {
-			receive_free = (i + position + 1) % prx_size;
-			return &receive_buffer[(i + position) % prx_size];
+	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
+		if (receive_buffer[(i + position) % LEVCAN_PARAM_QUEUE_SIZE].Param == 0) {
+			receive_free = (i + position + 1) % LEVCAN_PARAM_QUEUE_SIZE;
+			return &receive_buffer[(i + position) % LEVCAN_PARAM_QUEUE_SIZE];
 		}
 	}
 	return 0;
@@ -318,7 +317,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 				formatlength = strlen(node->Directories[pddir].Address[pdindex].Formatting);
 			//now allocate full size
 			int32_t totalsize = sizeof(parameterValuePacked_t) + namelength + formatlength + 2;
-			parameterValuePacked_t* param_to_send = pvPortMalloc(totalsize);
+			parameterValuePacked_t* param_to_send = lcmalloc(totalsize);
 
 			if (param_to_send == 0)
 				return nullrec; // nothing to do so here
@@ -413,7 +412,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 				int strpos = 0;
 				if (param_received->Literals[0] != 0) {
 					int length = strlen(param_received->Literals);
-					receiver->Param->Name = pvPortMalloc(length + 1);
+					receiver->Param->Name = lcmalloc(length + 1);
 					if (receiver->Param->Name)
 						strcpy(receiver->Param->Name, &param_received->Literals[strpos]);
 					strpos = length;
@@ -423,7 +422,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 				//extract formatting
 				if (param_received->Literals[strpos] != 0) {
 					int length = strlen(&param_received->Literals[strpos]);
-					receiver->Param->Formatting = pvPortMalloc(length + 1);
+					receiver->Param->Formatting = lcmalloc(length + 1);
 					if (receiver->Param->Formatting)
 						strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
 					strpos = length + 1;
@@ -485,7 +484,11 @@ void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_nod
 }
 
 void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, int full) {
-
+	LC_NodeDescription_t* node = sender_node;
+	if (node == 0)
+		node = &own_nodes[0];
+	if (node->State != LCNodeState_Online)
+		return;
 	bufferedParam_t* receive = findFreeRx();
 	if (receive == 0)
 		return;
@@ -511,7 +514,7 @@ void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* se
 
 void LC_ParametersStopUpdating(void) {
 	//clean up all tx buffers,
-	for (int i = 0; i < prx_size; i++) {
+	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
 		receive_buffer[i].Param = 0;
 		receive_buffer[i].Directory = 0;
 		receive_buffer[i].Source = 0;
