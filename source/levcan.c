@@ -413,6 +413,7 @@ void LC_NetworkManager(uint32_t tick) {
 		} else if (own_nodes[i].ShortName.NodeID < LC_Broadcast_Address) {
 			if (own_nodes[i].State == LCNodeState_WaitingClaim && own_nodes[i].LastTXtime + 250 > time) {
 				own_nodes[i].State = LCNodeState_Online;
+				configureFilters(); //todo make it faster?
 				trace_printf("We are online ID:%d\n", own_nodes[i].ShortName.NodeID);
 			}
 		}
@@ -1061,6 +1062,8 @@ void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, ui
 		hdr.Priority = ~object->Attributes.Priority;
 		hdr.Request = 0;
 		hdr.Parity = 0;
+		hdr.RTS_CTS = 1; //data start
+		hdr.EoM = 1; //data end
 		hdr.Source = node->ShortName.NodeID;
 		hdr.Target = target;
 
