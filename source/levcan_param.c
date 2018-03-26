@@ -94,7 +94,7 @@ uint16_t check_align(const LC_ParameterAdress_t* parameter) {
 	default:
 		break;
 	}
-#if defined(TRACE)
+#ifdef LEVCAN_TRACE
 	if (align) {
 		trace_printf("Invalid address align 0x%08X in parameter '%s'\n", parameter->Address, parameter->Name);
 	}
@@ -453,17 +453,23 @@ void ParamInfo_Size(void* vnode) {
 				textsize += strlen(node->Directories[i].Address[b].Formatting) + 1;
 		}
 	}
+#ifdef LEVCAN_TRACE
 	trace_printf("Parameters: %d, size bytes: %d, text: %d, total: %d\n", parameters, size, textsize, size + textsize);
+#endif
 }
 
 void LC_ParametersPrintAll(void* vnode) {
 	LC_NodeDescription_t* node = vnode;
+#ifdef LEVCAN_TRACE
 	trace_printf("# %s\n", node->DeviceName);
 	trace_printf("# Network ID: %d\n", node->ShortName.NodeID);
 	trace_printf("# %s system config:\n", node->NodeName);
+#endif
 	for (int dir = 0; dir < node->DirectoriesSize; dir++) {
 		for (int i = 1; i < node->Directories[dir].Size; i++) {
+#ifdef LEVCAN_TRACE
 			trace_printf(printParam(&node->Directories[dir].Address[i]));
+#endif
 		}
 	}
 }

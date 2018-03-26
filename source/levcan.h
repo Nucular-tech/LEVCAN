@@ -125,6 +125,11 @@ typedef struct {
 	uint16_t DirectoriesSize;
 } LC_NodeDescription_t;
 
+typedef struct {
+	LC_NodeShortName ShortName;
+	uint32_t LastRXtime;
+} LC_NodeTable_t;
+
 typedef LC_ObjectRecord_t (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
 
 typedef enum {
@@ -139,11 +144,12 @@ enum {
 	LC_RX, LC_TX, LC_NodeFreeIDmin = 64, LC_NodeFreeIDmax = 125
 };
 
-uintptr_t* LC_CreateNode(LC_NodeInit_t node, uint32_t time);
+uintptr_t* LC_CreateNode(LC_NodeInit_t node);
 void LC_AddressClaimHandler(LC_NodeShortName node, uint16_t mode);
 void LC_ReceiveHandler(uint32_t tick);
 void LC_NetworkManager(uint32_t time);
 void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
 void LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
+void LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
