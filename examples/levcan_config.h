@@ -7,6 +7,9 @@
 
 #pragma once
 
+#define LEVCAN_TRACE
+//#define trace_printf printf
+
 #define LEVCAN_MAX_OWN_NODES 2
 #define LEVCAN_MAX_TABLE_NODES 10
 #define LEVCAN_TX_SIZE 20
