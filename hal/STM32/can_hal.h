@@ -1,8 +1,13 @@
 /*
  * CAN driver library by V.Sukhoparov
  */
-
+#ifdef  STM32F10X_MD
+#include "stm32f10x.h"
+#endif
+#if defined(STM32F405XX) || defined(STM32F446)
 #include "stm32f4xx.h"
+#endif
+
 
 #pragma once
 
