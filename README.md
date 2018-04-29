@@ -25,3 +25,6 @@ Each message that is sent by a Node contains source address. There are 128 possi
 CAN 1Mbps
 7812.5 msg/s at 8byte (total msg 128 bit)
 62500 data bytes max
+
+![alt text](https://i.imgur.com/L0YKIc9.png)
+![alt text](https://i.imgur.com/CYgbNCG.png)
