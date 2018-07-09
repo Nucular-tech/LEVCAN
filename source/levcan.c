@@ -954,13 +954,14 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 		LC_NodeDescription_t* node = findNode(object->Header.Target);
 		//check check and check again
 		LC_ObjectRecord_t obj = findObjectRecord(object->Header.MsgID, object->Position, node, Write, object->Header.Source);
-		if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
+		if (obj.Attributes.Writable != 0) {
 			if (obj.Attributes.Function) {
 				//function call
 				//unpack header
 				LC_Header unpack = headerUnpack(object->Header);
 				//call
-				((LC_FunctionCall_t) obj.Address)(node, unpack, object->Pointer, object->Position);
+				if (obj.Address)
+					((LC_FunctionCall_t) obj.Address)(node, unpack, object->Pointer, object->Position);
 				//cleanup
 				lcfree(object->Pointer);
 			} else if (obj.Attributes.Pointer) {
@@ -971,7 +972,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 				//cleanup if there was pointer
 				if (clean)
 					lcfree(clean);
-			} else {
+			} else if (obj.Address) {
 				//just copy data as usual to specific location
 				int32_t size = abs(obj.Size);
 				memcpy(obj.Address, object->Pointer, size);
