@@ -1025,9 +1025,9 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 		}
 		//if system object not found, search in external
 		for (int i = 0; i < objsize; i++) {
-			//extract pointer, size and attributes
 			//TODO optimize mimimi
 			record = ((LC_ObjectRecord_t*) objectArray[i].Address);
+			//extract pointer, size and attributes
 			if (objectArray[i].Attributes.Record) {
 				rec.Address = record->Address;
 				rec.Size = record->Size;
@@ -1244,4 +1244,4 @@ LC_NodeShortName LC_GetActiveNodes(void) {
 	}
 	last_pos = LEVCAN_MAX_TABLE_NODES;
 	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-}
+		}

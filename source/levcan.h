@@ -18,18 +18,18 @@ typedef union {
 		unsigned Writable :1;	//Nodes may write to the variable
 		unsigned TCP :1;		//Node should control packets sent (RTS/CTS) and create special tx/rx buffer
 		unsigned Priority :2;
-		unsigned Record :1;		//Object remapped to record
-		unsigned Function :1;	//Functional call
+		unsigned Record :1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
+		unsigned Function :1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
 		unsigned Pointer :1;	//received data will be saved as pointer to memory area, if there is already exists, it will be free. TX - data taken from pointerS
-		unsigned Cleanup :1;	//after transmission pointer will  memfree
+		unsigned Cleanup :1;	//after transmission pointer will call memfree
 	};
 } LC_ObjectAttributes_t;
 
 typedef struct {
 	uint16_t Index; //message id
 	LC_ObjectAttributes_t Attributes;
-	int32_t Size; //in bytes
-	void* Address; //pointer to variable or function call
+	int32_t Size; //in bytes, can be negative (useful for strings), i.e. -1 = maximum length 1, -10 = maximum length 10. Request size 0 returns any first object
+	void* Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]
 } LC_Object_t;
 
 typedef struct {
