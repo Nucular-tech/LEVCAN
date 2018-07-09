@@ -11,6 +11,7 @@
 #include "stdlib.h"
 #include "can_hal.h"
 
+
 typedef union {
 	uint32_t ToUint32;
 	struct {
@@ -54,6 +55,9 @@ enum {
 	Read, Write
 };
 
+#ifdef LEVCAN_TRACE
+extern int trace_printf(const char* format, ...);
+#endif
 extern void *lcmalloc(uint32_t size);
 extern void lcfree(void *pointer);
 extern LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
@@ -199,7 +203,7 @@ void initialize(void) {
 	static uint16_t startup = 0;
 	if (startup)
 		return;
-	CAN_Init();
+
 	startup = 1;
 
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++)

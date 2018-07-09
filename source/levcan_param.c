@@ -438,7 +438,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 	return nullrec; // nothing to do so here
 }
 
-void ParamInfo_Size(void* vnode) {
+void LC_ParamInfo_Size(void* vnode) {
 	LC_NodeDescription_t* node = vnode;
 	int32_t size = 0;
 	int32_t textsize = 0;

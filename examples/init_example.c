@@ -8,6 +8,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include "levcan.h"
+#include "can_hal.h"
 
 struct {
 	uint32_t Data1;
@@ -68,6 +69,9 @@ LC_NodeDescription_t* mynode;
 
 void nwrk_manager(void);
 void Init_LEVCAN(void) {
+	
+	CAN_InitFromClock(RCC_APB1_CLK, 1000, 2, 87);
+	
 	LC_NodeInit_t node_init;
 
 	node_init.DeviceName = "Some Awesome Device";

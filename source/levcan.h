@@ -3,6 +3,7 @@
  * levcan.h
  *      Author: Vasiliy Sukhoparov (VasiliSk)
  */
+
 #include "stdint.h"
 /* Application specific configuration options. */
 #include "levcan_config.h"

@@ -1,23 +1,108 @@
 #include "can_hal.h"
 #include <string.h>
+#include <math.h>
 
+#ifdef  STM32F10X_MD
+#include "stm32f10x.h"
+#endif
+#if  defined(STM32F446xx) || defined(STM32F405xx)
+#include "stm32f4xx.h"
+#endif
+
+const float accuracy = 1.e-3;	// minimum required accuracy of the bit time
 uint8_t _getFreeTX();
 extern void LC_ReceiveHandler(void);
+#ifdef TRACE
+extern int trace_printf(const char* format, ...);
+#endif
+/// Initialize CAN core using desired freq and bus freq
+/// @param PCLK - prescaler input clock
+/// @param bitrate_khzn - CAN bus bitrate
+/// @param sjw - Synchronization Jump Width, 1..4
+/// @param sample_point in %, for default is 87%
+void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16_t sample_point) {
+	uint16_t max_brp = 1024, min_tq = 8, max_tq = 25, max_tq1 = 16, max_sjw = 4; //stm32 specific
+	float thisBittime = 1.0f / (bitrate_khz * 1000);
+	uint32_t btr = 0;
+
+	if (sjw > max_sjw)
+		sjw = max_sjw;
+	else if (sjw <= 0)
+		sjw = 1;
+
+	trace_printf("CAN init, clock: %d, bitrate: %dkHz, SJW: %d, sample point: %d%%\n", PCLK, bitrate_khz, sjw, sample_point);
+	// for all possible BRP - bit rate prescaler registers do
+	for (int brpreg = 0; brpreg < max_brp; brpreg++) {
+		int brp = brpreg + 1;
+		float t_scl = 1.0f / PCLK * brp;
+		float ratio = thisBittime / t_scl; // real ratio
+		// get rratio, the integer part of ratio
+		int rratio = roundf(ratio);  // to integer rounded ratio
+		float accy;	// accuracy
+
+		if (rratio < min_tq)
+			break; // end
+		if (rratio <= max_tq) {
+			accy = rratio - ratio;
+			if (fabsf(accy) < accuracy) {
+				//round
+				if (fabsf(accy) < 1.e-13) {
+					accy = 0.0;
+				}
+				//trace_printf("Accuracy OK: %.4f", accy);
+
+				// ok, found a good divisor
+				// set t_seg1 to sample_point (in %)
+				/* comes from input */
+				int t_seg1 = roundf(rratio * sample_point / 100.f) - 1;
+				int t_seg2 = rratio - 1 - t_seg1;
+				float real_sp = (t_seg1 + 1) * 100.f / rratio;
+
+				//Do some generic simple tests on the results got so far.
+				//sample point at the beginning of a bit makes no sense
+				if (real_sp < 50)
+					continue;
+				if (t_seg1 > max_tq1)
+					continue;
+				if (t_seg2 < 1)
+					continue;
+
+				// -1 for register value
+				brp = brp - 1;
+				// last part is CAN controller specific
+				btr = brp | ((t_seg1 - 1) << 16) | ((t_seg2 - 1) << 20) | ((sjw - 1) << 24);
+				// end for an entry with good accuracy
+				trace_printf("Prescaler: %d, ratio: %.2f, rratio: %d, accy: %.4f\n", brp, ratio, rratio, ((float) rratio - ratio));
+				trace_printf("tseg1: %d, tseg2: %d, sp: %.1f%%, brp: %d, tq num: %d \n", t_seg1, t_seg2, real_sp, brp, (1 + t_seg1 + t_seg2));
+				break; //done
+			}
+		}
+	}
+
+	if (btr)
+		CAN_Init(btr);
+	else {
+		trace_printf("Can init failed, no divider found");
+#ifdef DEBUG
+		__BKPT();
+#endif
+	}
+}
+
 /// Initialize CAN core
 /// @param BTR bitrate setting, calculate at http://www.bittiming.can-wiki.info/
-void CAN_Init(void) {
+void CAN_Init(uint32_t BTR) {
 	CAN1->MCR |= CAN_MCR_INRQ; //init can
 	while ((CAN1->MSR & CAN_MSR_INAK) == 0)
 		;
 	CAN1->MCR &= ~CAN_MCR_SLEEP;
 
-	CAN1->BTR = CAN_HAL_BTR; //calculated for 1mhz http://www.bittiming.can-wiki.info/
+	CAN1->BTR = BTR; //calculated for 1mhz http://www.bittiming.can-wiki.info/
 	CAN1->MCR = CAN_MCR_TXFP; // normal mode, transmit by message order
 
-	CAN1->IER = CAN_IER_EPVIE | CAN_IER_ERRIE | CAN_IER_FMPIE0 | CAN_IER_FMPIE1 /*CAN_IER_FFIE0 |  */
-			| CAN_IER_TMEIE;
-#if defined(STM32F405XX) || defined(STM32F446)
+	CAN1->IER = CAN_IER_BOFIE | CAN_IER_EPVIE | CAN_IER_ERRIE | CAN_IER_FMPIE0 | CAN_IER_FMPIE1 | CAN_IER_TMEIE;
 
+#if defined(STM32F405xx) || defined(STM32F446xx)
 	NVIC_SetPriority(CAN1_RX0_IRQn, 14);
 	NVIC_EnableIRQ(CAN1_RX0_IRQn);
 	NVIC_SetPriority(CAN1_RX1_IRQn, 14);
@@ -102,11 +187,9 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 			//bind empty register to new type
 			FilterActivation |= (1 << filter_bank);
 			//filter size
-			CAN1->FS1R = (reg.ExtensionID << filter_bank)
-					| (CAN1->FS1R & ~(1 << filter_bank)); //16b or 32b?
+			CAN1->FS1R = (reg.ExtensionID << filter_bank) | (CAN1->FS1R & ~(1 << filter_bank)); //16b or 32b?
 			//FIFO
-			CAN1->FFA1R = (fifo << filter_bank)
-					| (CAN1->FFA1R & ~(1 << filter_bank));
+			CAN1->FFA1R = (fifo << filter_bank) | (CAN1->FFA1R & ~(1 << filter_bank));
 			//mode - index
 			CAN1->FM1R |= (1 << filter_bank);
 			//fill register with invalid value
@@ -117,25 +200,18 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 			//already active
 			relative = 0;
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank))
-					== (reg.ExtensionID << filter_bank))
-					&& ((CAN1->FFA1R & (1 << filter_bank))
-							== (fifo << filter_bank))
+			if (((CAN1->FS1R & (1 << filter_bank)) == (reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == (fifo << filter_bank))
 					&& ((CAN1->FM1R & (1 << filter_bank)) != 0)) {
-				if ((reg.ExtensionID
-						&& (CAN1->sFilterRegister[filter_bank].FR2 & 1) == 1))
+				if ((reg.ExtensionID && (CAN1->sFilterRegister[filter_bank].FR2 & 1) == 1))
 					//extended index - next reg
 					relative = 1;
 				else {
 					//look for empty filter
-					if ((CAN1->sFilterRegister[filter_bank].FR1 & 0xFFFF0000)
-							== 0xFFFF0000)
+					if ((CAN1->sFilterRegister[filter_bank].FR1 & 0xFFFF0000) == 0xFFFF0000)
 						relative = 1;
-					else if ((CAN1->sFilterRegister[filter_bank].FR2 & 0xFFFF)
-							== 0xFFFF)
+					else if ((CAN1->sFilterRegister[filter_bank].FR2 & 0xFFFF) == 0xFFFF)
 						relative = 2;
-					else if ((CAN1->sFilterRegister[filter_bank].FR2
-							& 0xFFFF0000) == 0xFFFF0000)
+					else if ((CAN1->sFilterRegister[filter_bank].FR2 & 0xFFFF0000) == 0xFFFF0000)
 						relative = 3;
 				}
 			}
@@ -155,24 +231,16 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 	} else {
 		switch (relative) {
 		case 0:
-			CAN1->sFilterRegister[filter_bank].FR1 = (reg.STID << 5)
-					| (reg.Request << 4)
-					| (CAN1->sFilterRegister[filter_bank].FR1 & ~0xFFFF);
+			CAN1->sFilterRegister[filter_bank].FR1 = (reg.STID << 5) | (reg.Request << 4) | (CAN1->sFilterRegister[filter_bank].FR1 & ~0xFFFF);
 			break;
 		case 1:
-			CAN1->sFilterRegister[filter_bank].FR1 = ((reg.STID << 5)
-					| (reg.Request << 4)) << 16
-					| (CAN1->sFilterRegister[filter_bank].FR1 & 0xFFFF);
+			CAN1->sFilterRegister[filter_bank].FR1 = ((reg.STID << 5) | (reg.Request << 4)) << 16 | (CAN1->sFilterRegister[filter_bank].FR1 & 0xFFFF);
 			break;
 		case 2:
-			CAN1->sFilterRegister[filter_bank].FR2 = (reg.STID << 5)
-					| (reg.Request << 4)
-					| (CAN1->sFilterRegister[filter_bank].FR2 & ~0xFFFF);
+			CAN1->sFilterRegister[filter_bank].FR2 = (reg.STID << 5) | (reg.Request << 4) | (CAN1->sFilterRegister[filter_bank].FR2 & ~0xFFFF);
 			break;
 		case 3:
-			CAN1->sFilterRegister[filter_bank].FR2 = ((reg.STID << 5)
-					| (reg.Request << 4)) << 16
-					| (CAN1->sFilterRegister[filter_bank].FR2 & 0xFFFF);
+			CAN1->sFilterRegister[filter_bank].FR2 = ((reg.STID << 5) | (reg.Request << 4)) << 16 | (CAN1->sFilterRegister[filter_bank].FR2 & 0xFFFF);
 			break;
 		}
 	}
@@ -202,11 +270,9 @@ CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 			//bind empty register to new type
 			FilterActivation |= (1 << filter_bank);
 			//filter size
-			CAN1->FS1R = (reg.ExtensionID << filter_bank)
-					| (CAN1->FS1R & ~(1 << filter_bank)); //16b or 32b?
+			CAN1->FS1R = (reg.ExtensionID << filter_bank) | (CAN1->FS1R & ~(1 << filter_bank)); //16b or 32b?
 			//FIFO
-			CAN1->FFA1R = (fifo << filter_bank)
-					| (CAN1->FFA1R & ~(1 << filter_bank));
+			CAN1->FFA1R = (fifo << filter_bank) | (CAN1->FFA1R & ~(1 << filter_bank));
 			//mode - mask
 			CAN1->FM1R &= ~(1 << filter_bank);
 			//fill register with invalid value
@@ -214,26 +280,17 @@ CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 				CAN1->sFilterRegister[filter_bank].FR1 = reg.ToUint32 & ~1; //must match impossible
 				CAN1->sFilterRegister[filter_bank].FR2 = mask.ToUint32 & ~1; //must match impossible
 			} else {
-				CAN1->sFilterRegister[filter_bank].FR1 = ((reg.STID << 5)
-						| (reg.Request << 4))
-						| (((mask.STID << 5) | (mask.Request << 4)) << 16);
+				CAN1->sFilterRegister[filter_bank].FR1 = ((reg.STID << 5) | (reg.Request << 4)) | (((mask.STID << 5) | (mask.Request << 4)) << 16);
 				CAN1->sFilterRegister[filter_bank].FR2 = 0xFFFFFFFF; //must match impossible
 			}
 			break;
 		} else {
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank))
-					== (reg.ExtensionID << filter_bank))
-					&& ((CAN1->FFA1R & (1 << filter_bank))
-							== (fifo << filter_bank))
+			if (((CAN1->FS1R & (1 << filter_bank)) == (reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == (fifo << filter_bank))
 					&& ((CAN1->FM1R & (1 << filter_bank)) == 0)) {
-				if (!reg.ExtensionID
-						&& CAN1->sFilterRegister[filter_bank].FR2
-								== 0xFFFFFFFF) {
+				if (!reg.ExtensionID && CAN1->sFilterRegister[filter_bank].FR2 == 0xFFFFFFFF) {
 					//extended only one filter
-					CAN1->sFilterRegister[filter_bank].FR2 = ((reg.STID << 5)
-							| (reg.Request << 4))
-							| (((mask.STID << 5) | (mask.Request << 4)) << 16);
+					CAN1->sFilterRegister[filter_bank].FR2 = ((reg.STID << 5) | (reg.Request << 4)) | (((mask.STID << 5) | (mask.Request << 4)) << 16);
 					break;
 				}
 			}
@@ -277,26 +334,7 @@ CAN_Status CAN_Send(uint32_t index32, uint32_t* data, uint16_t length) {
 
 	return CANH_Ok;
 }
-/*
- CAN_Status CAN_SendIndex(uint32_t index32) {
- CAN_IR index = { .ToUint32 = index32 };
- uint8_t txBox;
- #ifdef CAN_ForceEXID
- index.ExtensionID = 1;
- #endif
- #ifdef CAN_ForceSTID
- index.ExtensionID=0;
- #endif
- txBox = _getFreeTX();
- if (txBox > 2)
- return CANH_QueueFull;
 
- CAN1->sTxMailBox[txBox].TDTR = 0; //data length = 0
- CAN1->sTxMailBox[txBox].TIR = index.ToUint32 | 1; //transmit
-
- return CANH_Ok;
- }
- */
 CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length) {
 	CAN_Status status = CANH_QueueEmpty;
 //check is there something
@@ -338,8 +376,6 @@ uint8_t _getFreeTX() {
 	return txBox;
 }
 
-
-
 void CAN1_SCE_IRQHandler(void) {
 	CAN1->MSR |= CAN_MSR_ERRI;
 	CAN_Start();
@@ -351,21 +387,21 @@ void CAN1_RX1_IRQHandler(void) {
 
 }
 
-#if defined(STM32F405XX) || defined(STM32F446)
-	void CAN1_RX0_IRQHandler(void) {
+#if defined(STM32F405xx) || defined(STM32F446xx)
+void CAN1_RX0_IRQHandler(void) {
 	LC_ReceiveHandler();
 }
 void CAN1_TX_IRQHandler(void) {
-		//remove interrupts
-		LC_TransmitHandler();
+	//remove interrupts
+	LC_TransmitHandler();
 
-		CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
-	}
+	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+}
 
-	#endif
+#endif
 
 #ifdef STM32F10X_MD
-void  USB_LP_CAN1_RX0_IRQHandler(void) {
+void USB_LP_CAN1_RX0_IRQHandler(void) {
 	LC_ReceiveHandler();
 }
 void USB_HP_CAN1_TX_IRQHandler(void) {
@@ -374,5 +410,4 @@ void USB_HP_CAN1_TX_IRQHandler(void) {
 	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
 }
 #endif
-
 

@@ -98,7 +98,7 @@ typedef struct {
 
 #define DIRDEF(NAME)		{NAME,(sizeof(NAME)/sizeof(NAME[0]))}
 
-void ParamInfo_Size(void* vnode);
+void LC_ParamInfo_Size(void* vnode);
 void LC_ParametersPrintAll(void* vnode);
 void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, int full);
 void LC_ParametersStopUpdating(void);
