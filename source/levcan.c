@@ -431,6 +431,8 @@ void LC_ReceiveHandler(uint32_t time) {
 
 void LC_NetworkManager(uint32_t tick) {
 	static uint32_t tick_last = 0;
+	if (tick_last == 0)
+		tick_last = tick;
 	uint32_t time = tick - tick_last;
 	tick_last = tick;
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
@@ -442,7 +444,7 @@ void LC_NetworkManager(uint32_t tick) {
 				//we ready to begin address claim
 				//todo move to claimFreeID
 				uint16_t freeid = own_nodes[i].LastID;
-				while (searchIndexCollision(own_nodes[i].LastID, &own_nodes[i])) {
+				while (searchIndexCollision(freeid, &own_nodes[i])) {
 					freeid++;
 					if (freeid > LC_NodeFreeIDmax || freeid < LC_NodeFreeIDmin)
 						freeid = LC_NodeFreeIDmin;
@@ -671,7 +673,7 @@ void LC_NetworkManager(uint32_t tick) {
 //now look for dead nodes...
 	static uint32_t offline_tick = 0;
 	offline_tick += time;
-	if (offline_tick > 250) { //0.5s
+	if (offline_tick > 500) { //0.5s
 		for (int i = 0; i < LEVCAN_MAX_TABLE_NODES; i++) {
 			//send every node id
 			if (node_table[i].ShortName.NodeID < LC_Null_Address) {
