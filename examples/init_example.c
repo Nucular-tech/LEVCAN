@@ -88,7 +88,7 @@ void Init_LEVCAN(void) {
 	node_init.Configurable = 1; // we have configurable variables
 	node_init.Directories = paramDirectories;
 	node_init.DirectoriesSize = paramDirectoriesSize;
-	mynode = LC_CreateNode(node_init, xTaskGetTickCount());
+	mynode = LC_CreateNode(node_init);
 
 	xTaskCreate(nwrk_manager, "LC", configMINIMAL_STACK_SIZE, NULL, OS_PRIORITY_LOW, (TaskHandle_t *) NULL);
 	//request all device names in network

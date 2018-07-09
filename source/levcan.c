@@ -11,7 +11,6 @@
 #include "stdlib.h"
 #include "can_hal.h"
 
-
 typedef union {
 	uint32_t ToUint32;
 	struct {
@@ -1228,3 +1227,21 @@ void LC_TransmitHandler(void) {
 	}
 }
 
+/// Call this function in loop get all active nodes. Ends when returns LC_Broadcast_Address
+/// @return Returns active node short name
+LC_NodeShortName LC_GetActiveNodes(void) {
+	static int last_pos = 0;
+	int i = last_pos + 1;
+	//new run
+	if (last_pos >= LEVCAN_MAX_TABLE_NODES)
+		i = 0;
+	//search
+	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
+		if (node_table[i].ShortName.NodeID != LC_Broadcast_Address) {
+			last_pos = i;
+			return node_table[i].ShortName;
+		}
+	}
+	last_pos = LEVCAN_MAX_TABLE_NODES;
+	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
+}

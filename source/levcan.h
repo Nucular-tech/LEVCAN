@@ -52,7 +52,6 @@ typedef struct {
 	};
 } LC_Header;
 
-
 typedef struct {
 	union {
 		uint32_t ToUint32[2];
@@ -154,3 +153,4 @@ void LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 void LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
+LC_NodeShortName LC_GetActiveNodes(void);
