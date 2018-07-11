@@ -486,12 +486,12 @@ void LC_ParametersPrintAll(void* vnode) {
 /// @param receiver_node Receiver ID node
 LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) {
 	//send function will use fast send, so it is  safe
-	storeValuePacked_t store;
+	storeValuePacked_t store= { 0 };
 	store.Directory = dir;
 	store.Index = paramv->Index;
 	store.Value = paramv->Value;
 
-	LC_ObjectRecord_t record;
+	LC_ObjectRecord_t record= { 0 };
 	record.Address = &store;
 	record.Attributes.TCP = 1;
 	record.Attributes.Priority = LC_Priority_Low;
@@ -515,12 +515,12 @@ LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, v
 	receive->Directory = dir;
 	receive->Source = receiver_node;
 
-	uint8_t data[3];
+	uint8_t data[3] = { 0 };
 	data[0] = paramv->Index;
 	data[1] = dir;
 	data[2] = 0;
 
-	LC_ObjectRecord_t record;
+	LC_ObjectRecord_t record = { 0 };
 	record.Address = &data;
 	record.Attributes.TCP = 1;
 	record.Attributes.Priority = LC_Priority_Low;

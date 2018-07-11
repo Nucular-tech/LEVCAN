@@ -112,8 +112,8 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	if (node.VendorName != 0 && strnlen(node.VendorName, 128) == 128)
 		node.VendorName = 0;
 
-	LC_NodeDescription_t descr;
-	LC_NodeShortName sname;
+	LC_NodeDescription_t descr = { 0 };
+	LC_NodeShortName sname = { 0 };
 	sname.Configurable = node.Configurable;
 	sname.DeviceType = node.DeviceType;
 	sname.ManufacturerCode = node.ManufacturerCode;
@@ -178,7 +178,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	objparam->Attributes.Readable = 1;
 	objparam->Index = LC_SYS_SerialNumber;
 	objparam->Size = sizeof(own_nodes[i].Serial);
-
+	//todo add server also?!
 	if (own_nodes[i].ShortName.Configurable) {
 		//parameter editor
 		objparam = &own_nodes[i].SystemObjects[sysinx++];
@@ -329,7 +329,7 @@ void configureFilters(void) {
 	CAN_FiltersClear();
 	CAN_FilterEditOn();
 //global filter
-	headerPacked_t reg, mask;
+	headerPacked_t reg = { 0 }, mask = { 0 };
 	reg.MsgID = LC_SYS_AddressClaimed;
 	reg.RTS_CTS = 0; //no matter
 	reg.Parity = 0; // no matter
@@ -356,7 +356,7 @@ void configureFilters(void) {
 
 void addAddressFilter(uint16_t address) {
 //global filter
-	headerPacked_t reg, mask;
+	headerPacked_t reg = { 0 }, mask = { 0 };
 	reg.MsgID = 0; //no matter
 	reg.RTS_CTS = 0; //no matter
 	reg.Parity = 0; // no matter
@@ -482,9 +482,12 @@ void LC_NetworkManager(uint32_t time) {
 			} else if (own_nodes[i].State == LCNodeState_Online) {
 				//we are online! why nobody asking for it?
 				own_nodes[i].LastTXtime += time;
-				if (own_nodes[i].LastTXtime > 1000) {
+				if (own_nodes[i].LastTXtime > 1250) {
 					own_nodes[i].LastTXtime = 0;
 					LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
+#ifdef LEVCAN_TRACE
+					trace_printf("Are we alone?:%d\n", own_nodes[i].ShortName.NodeID);
+#endif
 				}
 			}
 		}
@@ -832,7 +835,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 		if (request->EoM) {
 			//TX finished? delete this buffer anyway
 #ifdef LEVCAN_TRACE
-			trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
+			//trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
 #endif
 			//cleanup tx buffer also
 			if (object->Flags.TXcleanup)
@@ -946,7 +949,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 	 trace_printf("Timeout ");*/
 //pack new header responce
 	if (object->Flags.TCP) {
-		headerPacked_t hdr;
+		headerPacked_t hdr = { 0 };
 		if (object->Header.EoM) {
 			hdr.EoM = 1; //end of message
 			hdr.RTS_CTS = 0;
@@ -1123,7 +1126,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 		if (target == node->ShortName.NodeID)
 			return LC_Collision;
 		//form message header
-		headerPacked_t hdr;
+		headerPacked_t hdr = { 0 };
 		hdr.MsgID = index; //our node index
 		hdr.Priority = ~object->Attributes.Priority;
 		hdr.Request = 0; //data sending...
@@ -1168,7 +1171,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 		uint32_t data[2];
 		memcpy(data, dataAddr, size);
 
-		headerPacked_t hdr;
+		headerPacked_t hdr = { 0 };
 		hdr.MsgID = index;
 		hdr.Priority = ~object->Attributes.Priority;
 		hdr.Request = 0;
@@ -1195,7 +1198,7 @@ LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, ui
 	if (node->State != LCNodeState_Online)
 		return LC_NodeOffline;
 
-	headerPacked_t hdr;
+	headerPacked_t hdr = { 0 };
 	hdr.MsgID = index;
 	hdr.Priority = 0;
 	hdr.Request = 1;
@@ -1208,7 +1211,7 @@ LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, ui
 }
 
 LC_Return_t LC_SendDiscoveryRequest(uint16_t target) {
-	headerPacked_t hdr;
+	headerPacked_t hdr = { 0 };
 	hdr.MsgID = LC_SYS_AddressClaimed;
 	hdr.Priority = 0;
 	hdr.Request = 1;
@@ -1247,29 +1250,30 @@ LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
 		}
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
-	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-		}
+	LC_NodeShortName ret = (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address };
+	return ret;
+} //
 
-		/*
-		 LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
-		 LC_Object_t* rec = 0;
-		 int32_t findedsize = 0;
-		 if (node == 0)
-		 return rec;
-		 for (int i = 0; i < node->ObjectsSize; i++) {
-		 //extract
-		 if ((node->Objects[i].Attributes.Record) != 0) {
-		 LC_ObjectRecord_t* record = ((LC_ObjectRecord_t*) node->Objects[i].Address);
-		 findedsize = record->Size;
-		 rec = &node->Objects[i];
-		 } else
-		 findedsize = node->Objects[i].Size;
+/*
+ LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
+ LC_Object_t* rec = 0;
+ int32_t findedsize = 0;
+ if (node == 0)
+ return rec;
+ for (int i = 0; i < node->ObjectsSize; i++) {
+ //extract
+ if ((node->Objects[i].Attributes.Record) != 0) {
+ LC_ObjectRecord_t* record = ((LC_ObjectRecord_t*) node->Objects[i].Address);
+ findedsize = record->Size;
+ rec = &node->Objects[i];
+ } else
+ findedsize = node->Objects[i].Size;
 
-		 //compare: right size and index?
-		 if (size == findedsize && rec->Index == index)
-		 break; //yes
-		 else
-		 rec = 0; //no
-		 }
-		 return rec;
-		 }*/
+ //compare: right size and index?
+ if (size == findedsize && rec->Index == index)
+ break; //yes
+ else
+ rec = 0; //no
+ }
+ return rec;
+ }*/
