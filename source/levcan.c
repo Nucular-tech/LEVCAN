@@ -1222,20 +1222,20 @@ void LC_TransmitHandler(void) {
 /// @param n Pointer to stored position for search
 /// @return Returns active node short name
 LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
-	int i = *last_pos + 1;
+	int i = *last_pos;
 	//new run
 	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
 		i = 0;
 	//search
 	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID != LC_Broadcast_Address) {
-			*last_pos = i;
+			*last_pos = i + 1;
 			return node_table[i].ShortName;
 		}
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
 	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-		}
+}
 
 		/*
 		 LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
