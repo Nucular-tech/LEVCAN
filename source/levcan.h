@@ -137,7 +137,11 @@ typedef LC_ObjectRecord_t (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_He
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
-} LC_Priority;
+} LC_Priority_t;
+
+typedef enum {
+	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_NodeOffline, LC_MallocFail, LC_Collision
+} LC_Return_t;
 
 enum {
 	LC_Preffered_Address = 0, LC_Normal_Address = 64, LC_Null_Address = 126, LC_Broadcast_Address = 127,
@@ -151,9 +155,9 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node);
 void LC_AddressClaimHandler(LC_NodeShortName node, uint16_t mode);
 void LC_ReceiveHandler(uint32_t tick);
 void LC_NetworkManager(uint32_t time);
-void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
-void LC_SendRequest(void* sender, uint16_t target, uint16_t index);
-void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
-void LC_SendDiscoveryRequest(uint16_t target);
+LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
+LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
+LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
+LC_Return_t LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
-LC_NodeShortName LC_GetActiveNodes(int* last_pos) ;
+LC_NodeShortName LC_GetActiveNodes(int* last_pos);

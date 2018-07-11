@@ -87,7 +87,7 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 headerPacked_t headerPack(LC_Header header);
 LC_Header headerUnpack(headerPacked_t header);
 void claimFreeID(LC_NodeDescription_t* node);
-uint16_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length);
+LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length);
 uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg);
 uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request);
 void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end);
@@ -565,11 +565,16 @@ void LC_NetworkManager(uint32_t tick) {
 				} else {
 					//create new receive object
 					objBuffered* newRXobj = (objBuffered*) lcmalloc(sizeof(objBuffered));
-					if (newRXobj == 0)
+					if (newRXobj == 0) {
+						//get next buffer index
+						rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 						continue;
+					}
 					newRXobj->Pointer = lcmalloc(32);
 					if (newRXobj->Pointer == 0) {
 						lcfree(newRXobj);
+						//get next buffer index
+						rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 						continue;
 					}
 					newRXobj->Length = 32;
@@ -779,10 +784,10 @@ uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t* ownNode) {
 	return 0;
 }
 
-uint16_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length) {
+LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length) {
 
 	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE))
-		return 1;
+		return LC_BufferFull;
 
 	int empty = 0;
 	if (txFIFO_in == txFIFO_out)
@@ -803,7 +808,7 @@ uint16_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length) {
 //proceed queue if we can do;
 	if (empty)
 		LC_TransmitHandler();
-	return 0;
+	return LC_Ok;
 }
 
 uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
@@ -1070,43 +1075,26 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 	}
 	return rec;
 }
-/*
- LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
- LC_Object_t* rec = 0;
- int32_t findedsize = 0;
- if (node == 0)
- return rec;
- for (int i = 0; i < node->ObjectsSize; i++) {
- //extract
- if ((node->Objects[i].Attributes.Record) != 0) {
- LC_ObjectRecord_t* record = ((LC_ObjectRecord_t*) node->Objects[i].Address);
- findedsize = record->Size;
- rec = &node->Objects[i];
- } else
- findedsize = node->Objects[i].Size;
 
- //compare: right size and index?
- if (size == findedsize && rec->Index == index)
- break; //yes
- else
- rec = 0; //no
- }
- return rec;
- }*/
-
-void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index) {
+/// Sends LC_ObjectRecord_t to network
+/// @param sender
+/// @param object
+/// @param target
+/// @param index
+/// @return
+LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index) {
 	LC_NodeDescription_t* node = sender;
 	if (node == 0)
 		node = &own_nodes[0];
 	if (node->State != LCNodeState_Online)
-		return;
+		return LC_NodeOffline;
 
 	if (object == 0 || object->Address == 0)
-		return;
+		return LC_ObjectError;
 	char* dataAddr = object->Address;
 	//check that data is real
 	if (dataAddr == 0 && object->Size != 0)
-		return;
+		return LC_DataError;
 	//extract pointer
 	if (object->Attributes.Pointer)
 		dataAddr = *(char**) dataAddr;
@@ -1116,11 +1104,11 @@ void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, ui
 		objBuffered* txProceed = (objBuffered*) objTXbuf_start;
 		while (txProceed) {
 			if ((txProceed->Header.MsgID == index) && (txProceed->Header.Target == target))
-				return;
+				return LC_Collision;
 			txProceed = ((objBuffered*) txProceed->Next);
 		}
 		if (target == node->ShortName.NodeID)
-			return;
+			return LC_Collision;
 		//form message header
 		headerPacked_t hdr;
 		hdr.MsgID = index; //our node index
@@ -1131,7 +1119,7 @@ void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, ui
 		//create object sender instance
 		objBuffered* newTXobj = (objBuffered*) lcmalloc(sizeof(objBuffered));
 		if (newTXobj == 0)
-			return;
+			return LC_MallocFail;
 		newTXobj->Attempt = 0;
 		newTXobj->Header = hdr;
 		newTXobj->Length = object->Size;
@@ -1177,21 +1165,22 @@ void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, ui
 		hdr.Source = node->ShortName.NodeID;
 		hdr.Target = target;
 
-		sendDataToQueue(hdr, data, size);
+		return sendDataToQueue(hdr, data, size);
 	}
+	return LC_Ok;
 }
 
-void LC_SendRequest(void* sender, uint16_t target, uint16_t index) {
-	LC_SendRequestSpec(sender, target, index, 0, 0);
+LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index) {
+	return LC_SendRequestSpec(sender, target, index, 0, 0);
 }
 
-void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP) {
+LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP) {
 
 	LC_NodeDescription_t* node = sender;
 	if (node == 0)
 		node = &own_nodes[0];
 	if (node->State != LCNodeState_Online)
-		return;
+		return LC_NodeOffline;
 
 	headerPacked_t hdr;
 	hdr.MsgID = index;
@@ -1202,10 +1191,10 @@ void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t s
 	hdr.Source = node->ShortName.NodeID;
 	hdr.Target = target;
 
-	sendDataToQueue(hdr, 0, size);
+	return sendDataToQueue(hdr, 0, size);
 }
 
-void LC_SendDiscoveryRequest(uint16_t target) {
+LC_Return_t LC_SendDiscoveryRequest(uint16_t target) {
 	headerPacked_t hdr;
 	hdr.MsgID = LC_SYS_AddressClaimed;
 	hdr.Priority = 0;
@@ -1215,7 +1204,7 @@ void LC_SendDiscoveryRequest(uint16_t target) {
 	hdr.Source = LC_Broadcast_Address;
 	hdr.Target = target;
 
-	sendDataToQueue(hdr, 0, 0);
+	return sendDataToQueue(hdr, 0, 0);
 }
 
 void LC_TransmitHandler(void) {
@@ -1246,4 +1235,28 @@ LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
 	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-}
+		}
+
+		/*
+		 LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
+		 LC_Object_t* rec = 0;
+		 int32_t findedsize = 0;
+		 if (node == 0)
+		 return rec;
+		 for (int i = 0; i < node->ObjectsSize; i++) {
+		 //extract
+		 if ((node->Objects[i].Attributes.Record) != 0) {
+		 LC_ObjectRecord_t* record = ((LC_ObjectRecord_t*) node->Objects[i].Address);
+		 findedsize = record->Size;
+		 rec = &node->Objects[i];
+		 } else
+		 findedsize = node->Objects[i].Size;
+
+		 //compare: right size and index?
+		 if (size == findedsize && rec->Index == index)
+		 break; //yes
+		 else
+		 rec = 0; //no
+		 }
+		 return rec;
+		 }*/

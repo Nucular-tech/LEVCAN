@@ -6,6 +6,7 @@
  *      Author: Vasiliy Sukhoparov (VasiliSk)
  */
 #include "stdint.h"
+#include "levcan.h"
 
 #pragma once
 
@@ -102,6 +103,6 @@ typedef struct {
 
 void LC_ParamInfo_Size(void* vnode);
 void LC_ParametersPrintAll(void* vnode);
-void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node);
-void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, int full);
+LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) ;
+LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full);
 void LC_ParametersStopUpdating(void);

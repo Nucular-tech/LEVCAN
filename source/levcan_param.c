@@ -411,6 +411,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 				receiver->Param->ParamType = param_received->ParamType;
 				//receiver->Param->Index=param_received->Index; //should be equal
 				//extract name
+				//todo memfree for new parameteers
 				int strpos = 0;
 				if (param_received->Literals[0] != 0) {
 					int length = strlen(param_received->Literals);
@@ -483,7 +484,7 @@ void LC_ParametersPrintAll(void* vnode) {
 /// @param dir Directory index
 /// @param sender_node Sender node
 /// @param receiver_node Receiver ID node
-void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) {
+LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) {
 	//send function will use fast send, so it is  safe
 	storeValuePacked_t store;
 	store.Directory = dir;
@@ -495,7 +496,7 @@ void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_nod
 	record.Attributes.TCP = 1;
 	record.Attributes.Priority = LC_Priority_Low;
 	record.Size = sizeof(storeValuePacked_t);
-	LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
+	return LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
 }
 
 /// Asynchroniously updates parameter. Setup index and directory to get one.
@@ -504,14 +505,12 @@ void LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_nod
 /// @param sender_node Sender node, who is asking for
 /// @param receiver_node Receiver ID node
 /// @param full	0 - request just value, 1 - request full parameter information.
-void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, int full) {
+LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full) {
 	LC_NodeDescription_t* node = sender_node;
 
-	if (node == 0 || node->State != LCNodeState_Online)
-		return;
 	bufferedParam_t* receive = findFreeRx();
 	if (receive == 0)
-		return;
+		return LC_BufferFull;
 	receive->Param = paramv;
 	receive->Directory = dir;
 	receive->Source = receiver_node;
@@ -536,7 +535,7 @@ void LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* se
 		record.Size = 3;
 		paramv->ParamType |= PT_reqval;
 	}
-	LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
+	return LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
 }
 
 /// Stops all async updates of parameters
