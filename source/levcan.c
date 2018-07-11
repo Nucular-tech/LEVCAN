@@ -399,19 +399,25 @@ void LC_ReceiveHandler(uint32_t time) {
 				if (uheader.Target == LC_Broadcast_Address) {
 					//send every node id
 					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
-						if (own_nodes[i].ShortName.NodeID < LC_Null_Address && own_nodes[i].State >= LCNodeState_WaitingClaim)
+						if (own_nodes[i].ShortName.NodeID < LC_Null_Address && own_nodes[i].State >= LCNodeState_WaitingClaim) {
+							if (own_nodes[i].State == LCNodeState_Online)
+								own_nodes[i].LastTXtime = 0; //reset online timer
 							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
+						}
 					}
 				} else {
 					//single node
 					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
 						if (own_nodes[i].ShortName.NodeID == uheader.Target && own_nodes[i].State >= LCNodeState_WaitingClaim) {
+							if (own_nodes[i].State == LCNodeState_Online)
+								own_nodes[i].LastTXtime = 0; //reset online timer
 							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
 							return;
 						}
 					}
 				}
 			} else
+				//got some other claim
 				LC_AddressClaimHandler((LC_NodeShortName ) { .ToUint32[0] = data[0], .ToUint32[1] = data[1], .NodeID = uheader.Source }, LC_RX);
 		} else {
 			//buffer not full?
@@ -428,12 +434,8 @@ void LC_ReceiveHandler(uint32_t time) {
 
 }
 
-void LC_NetworkManager(uint32_t tick) {
-	static uint32_t tick_last = 0;
-	if (tick_last == 0)
-		tick_last = tick;
-	uint32_t time = tick - tick_last;
-	tick_last = tick;
+void LC_NetworkManager(uint32_t time) {
+
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
 		//send every node id
 		if (own_nodes[i].State == LCNodeState_NetworkDiscovery) {
@@ -449,12 +451,12 @@ void LC_NetworkManager(uint32_t tick) {
 						freeid = LC_NodeFreeIDmin;
 				}
 				own_nodes[i].State = LCNodeState_WaitingClaim;
+				own_nodes[i].LastTXtime = 0;
 				own_nodes[i].ShortName.NodeID = freeid;
 				CAN_FilterEditOn();
 				addAddressFilter(freeid);
 				CAN_FilterEditOff();
 				LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
-				own_nodes[i].LastTXtime = 0;
 #ifdef LEVCAN_TRACE
 				trace_printf("Discovery finish id:%d\n", own_nodes[i].ShortName.NodeID);
 #endif
@@ -463,16 +465,26 @@ void LC_NetworkManager(uint32_t tick) {
 			//we've lost id, get new one
 			//look for free id
 			//todo add delay or detect network on startup
+			own_nodes[i].LastTXtime = 0;
 			claimFreeID(&own_nodes[i]);
 		} else if (own_nodes[i].ShortName.NodeID < LC_Broadcast_Address) {
+
 			if (own_nodes[i].State == LCNodeState_WaitingClaim) {
 				own_nodes[i].LastTXtime += time;
 				if (own_nodes[i].LastTXtime > 250) {
 					own_nodes[i].State = LCNodeState_Online;
 					configureFilters(); //todo make it faster?
+					own_nodes[i].LastTXtime = 0;
 #ifdef LEVCAN_TRACE
 					trace_printf("We are online ID:%d\n", own_nodes[i].ShortName.NodeID);
 #endif
+				}
+			} else if (own_nodes[i].State == LCNodeState_Online) {
+				//we are online! why nobody asking for it?
+				own_nodes[i].LastTXtime += time;
+				if (own_nodes[i].LastTXtime > 1000) {
+					own_nodes[i].LastTXtime = 0;
+					LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
 				}
 			}
 		}
@@ -497,6 +509,7 @@ void LC_NetworkManager(uint32_t tick) {
 					//call object, return function should have processed record.
 					obj = ((LC_FunctionCall_t) obj.Address)(node, unpack, 0, 0);
 				}
+				obj.Attributes.TCP |= hdr.Parity; //force TCP mode if requested
 				LC_SendMessage((intptr_t*) node, &obj, hdr.Source, hdr.MsgID);
 			} else {
 				//find existing TX object
@@ -891,7 +904,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 			lcfree(object->Pointer);
 		deleteObject(object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
 #ifdef LEVCAN_TRACE
-		trace_printf("TX UDP finished:%d\n", object->Header.MsgID);
+		//trace_printf("TX UDP finished:%d\n", object->Header.MsgID);
 #endif
 	}
 	return 0;
@@ -1142,7 +1155,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 			objTXbuf_end = newTXobj;
 		}
 #ifdef LEVCAN_TRACE
-		trace_printf("New TX object created:%d\n", newTXobj->Header.MsgID);
+		//trace_printf("New TX object created:%d\n", newTXobj->Header.MsgID);
 #endif
 		objectTXproceed(newTXobj, 0);
 	} else {
@@ -1235,7 +1248,7 @@ LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
 	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-}
+		}
 
 		/*
 		 LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {

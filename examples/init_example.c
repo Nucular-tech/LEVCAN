@@ -99,8 +99,7 @@ void Init_LEVCAN(void) {
 void nwrk_manager(void) {
 	while (1) {
 
-		uint32_t tick = xTaskGetTickCount();
-		LC_NetworkManager(tick);
+		LC_NetworkManager(configTICK_RATE_HZ / 100);
 
 		static uint32_t prev_upd_time_sp = 0;
 		vTaskDelayUntil(&prev_upd_time_sp, configTICK_RATE_HZ / 100); //100hz CAN
