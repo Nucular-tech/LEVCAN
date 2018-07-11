@@ -7,7 +7,6 @@
 #include "stdint.h"
 /* Application specific configuration options. */
 #include "levcan_config.h"
-#include "levcan_param.h"
 
 #pragma once
 
@@ -20,7 +19,8 @@ typedef union {
 		unsigned Priority :2;
 		unsigned Record :1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
 		unsigned Function :1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
-		unsigned Pointer :1;	//received data will be saved as pointer to memory area, if there is already exists, it will be free. TX - data taken from pointerS
+		//received data will be saved as pointer to memory area, if there is already exists, it will be free
+		unsigned Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
 		unsigned Cleanup :1;	//after transmission pointer will call memfree
 	};
 } LC_ObjectAttributes_t;
@@ -29,13 +29,13 @@ typedef struct {
 	uint16_t Index; //message id
 	LC_ObjectAttributes_t Attributes;
 	int32_t Size; //in bytes, can be negative (useful for strings), i.e. -1 = maximum length 1, -10 = maximum length 10. Request size 0 returns any first object
-	void* Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]
+	void* Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
 } LC_Object_t;
 
 typedef struct {
 	int16_t Size;
 	LC_ObjectAttributes_t Attributes;
-	void* Address;
+	void* Address; //pointer to memory data. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
 	uint8_t NodeID;
 } LC_ObjectRecord_t;
 
@@ -60,6 +60,8 @@ typedef struct {
 			unsigned Variables :1;
 			unsigned SWUpdates :1;
 			unsigned Events :1;
+			unsigned FileServer :1;
+			unsigned reserved :(64 - 5 - 32);
 			unsigned DeviceType :10;
 			unsigned ManufacturerCode :10;
 			unsigned SerialNumber :12;
@@ -72,20 +74,21 @@ typedef struct {
 	char* NodeName;
 	char* DeviceName;
 	char* VendorName;
-	uint16_t DeviceType;
-	uint16_t VendorCode;
+	uint16_t DeviceType; //10bit
+	uint16_t ManufacturerCode; //10bit
 	struct {
-		unsigned Configurable :1;
-		unsigned SWUpdates :1;
-		unsigned Notifications :1;
-		unsigned Variables :1;
+		unsigned Configurable :1; //can be configured using levcan_param
+		unsigned Variables :1; //there are some variables can be read
+		unsigned SWUpdates :1; //device may be updated
+		unsigned Events :1; //can send events to network
+		unsigned FileServer :1; //can proceed file io operations from other nodes
 	};
 	int16_t NodeID; //-1 will autodetect, 0-63 preffered address, 64-125 all
-	uint32_t Serial;
-	LC_Object_t* Objects;
-	uint16_t ObjectsSize;
-	LC_ParameterDirectory_t* Directories;
-	uint16_t DirectoriesSize;
+	uint32_t Serial; //SN, used only 12bit
+	LC_Object_t* Objects; //CAN tx/rx user objects array
+	uint16_t ObjectsSize;	//array size (elements)
+	void* Directories; //array of LC_ParameterDirectory_t
+	uint16_t DirectoriesSize; //array size (elements)
 } LC_NodeInit_t;
 
 enum {
@@ -101,7 +104,7 @@ enum {
 	LC_SYS_Parameters,
 	LC_SYS_Variables,
 	LC_SYS_Events,
-	LC_SYS_FWUpdate,
+	LC_SYS_FileIO,
 	LC_SYS_Trace,
 	LC_SYS_DateTime,
 	LC_SYS_End,
@@ -121,7 +124,7 @@ typedef struct {
 	LC_Object_t* Objects;
 	uint16_t ObjectsSize;
 	LC_Object_t SystemObjects[LC_SYS_End - LC_SYS_NodeName];
-	LC_ParameterDirectory_t* Directories;
+	void* Directories;
 	uint16_t DirectoriesSize;
 } LC_NodeDescription_t;
 
@@ -153,4 +156,4 @@ void LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 void LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 void LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
-LC_NodeShortName LC_GetActiveNodes(void);
+LC_NodeShortName LC_GetActiveNodes(int* last_pos) ;

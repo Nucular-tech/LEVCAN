@@ -7,6 +7,8 @@
  */
 
 #include "levcan.h"
+#include "levcan_param.h"
+
 #include "string.h"
 #include "stdlib.h"
 #include "can_hal.h"
@@ -38,7 +40,7 @@ typedef struct {
 typedef struct {
 	char* Pointer;
 	int32_t Length;
-	int32_t Position; //get parity - divde by 8 and &1
+	int32_t Position; //get parity - divide by 8 and &1
 	headerPacked_t Header;
 	uint16_t Time_since_comm;
 	uint8_t Attempt;
@@ -59,6 +61,7 @@ extern int trace_printf(const char* format, ...);
 #endif
 extern void *lcmalloc(uint32_t size);
 extern void lcfree(void *pointer);
+
 extern LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
 //#### PRIVATE VARIABLES ####
 LC_NodeDescription_t own_nodes[LEVCAN_MAX_OWN_NODES];
@@ -113,8 +116,9 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	LC_NodeShortName sname;
 	sname.Configurable = node.Configurable;
 	sname.DeviceType = node.DeviceType;
-	sname.ManufacturerCode = node.VendorCode;
-	sname.Events = node.Notifications;
+	sname.ManufacturerCode = node.ManufacturerCode;
+	sname.Events = node.Events;
+	sname.FileServer = node.FileServer;
 	sname.SWUpdates = node.SWUpdates;
 	sname.Variables = node.Variables;
 	sname.SerialNumber = node.Serial;
@@ -152,21 +156,21 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 		objparam->Address = own_nodes[i].NodeName;
 		objparam->Attributes.Readable = 1;
 		objparam->Index = LC_SYS_NodeName;
-		objparam->Size = strlen(own_nodes[i].NodeName);
+		objparam->Size = strlen(own_nodes[i].NodeName) + 1; // plus zero byte
 	}
 	if (own_nodes[i].DeviceName) {
 		objparam = &own_nodes[i].SystemObjects[sysinx++];
 		objparam->Address = own_nodes[i].DeviceName;
 		objparam->Attributes.Readable = 1;
 		objparam->Index = LC_SYS_DeviceName;
-		objparam->Size = strlen(own_nodes[i].DeviceName);
+		objparam->Size = strlen(own_nodes[i].DeviceName) + 1;
 	}
 	if (own_nodes[i].VendorName) {
 		objparam = &own_nodes[i].SystemObjects[sysinx++];
 		objparam->Address = own_nodes[i].VendorName;
 		objparam->Attributes.Readable = 1;
 		objparam->Index = LC_SYS_VendorName;
-		objparam->Size = strlen(own_nodes[i].VendorName);
+		objparam->Size = strlen(own_nodes[i].VendorName) + 1;
 	}
 	//SN
 	objparam = &own_nodes[i].SystemObjects[sysinx++];
@@ -188,11 +192,6 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 
 	//begin network discovery for start
 	own_nodes[i].LastTXtime = 0;
-	/*	CAN_FilterEditOn();
-	 addAddressFilter(node.NodeID);
-	 CAN_FilterEditOff();
-	 own_nodes[i].State = LCNodeState_WaitingClaim;
-	 LC_AddressClaimHandler(sname, LC_TX);*/
 	LC_SendDiscoveryRequest(LC_Broadcast_Address);
 	own_nodes[i].State = LCNodeState_NetworkDiscovery;
 	return (uintptr_t*) &own_nodes[i];
@@ -634,7 +633,7 @@ void LC_NetworkManager(uint32_t tick) {
 		}
 		txProceed = next;
 	}
-//count work time and recall
+	//count work time and recall
 	objBuffered* rxProceed = (objBuffered*) objRXbuf_start;
 	while (rxProceed) {
 		objBuffered* next = (objBuffered*) rxProceed->Next;
@@ -670,10 +669,11 @@ void LC_NetworkManager(uint32_t tick) {
 	LC_TransmitHandler(); //start tx
 
 #if (LEVCAN_MAX_TABLE_NODES) > 0
-//now look for dead nodes...
+	//now look for dead nodes...
 	static uint32_t offline_tick = 0;
+	const int off_period = 250; //0.25s
 	offline_tick += time;
-	if (offline_tick > 500) { //0.5s
+	if (offline_tick > off_period) {
 		for (int i = 0; i < LEVCAN_MAX_TABLE_NODES; i++) {
 			//send every node id
 			if (node_table[i].ShortName.NodeID < LC_Null_Address) {
@@ -690,7 +690,7 @@ void LC_NetworkManager(uint32_t tick) {
 				}
 			}
 		}
-		offline_tick = offline_tick % 500;
+		offline_tick = offline_tick % off_period;
 	}
 #endif
 //vTaskDelay(250);
@@ -954,14 +954,13 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 		LC_NodeDescription_t* node = findNode(object->Header.Target);
 		//check check and check again
 		LC_ObjectRecord_t obj = findObjectRecord(object->Header.MsgID, object->Position, node, Write, object->Header.Source);
-		if (obj.Attributes.Writable != 0) {
+		if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
 			if (obj.Attributes.Function) {
 				//function call
 				//unpack header
 				LC_Header unpack = headerUnpack(object->Header);
 				//call
-				if (obj.Address)
-					((LC_FunctionCall_t) obj.Address)(node, unpack, object->Pointer, object->Position);
+				((LC_FunctionCall_t) obj.Address)(node, unpack, object->Pointer, object->Position);
 				//cleanup
 				lcfree(object->Pointer);
 			} else if (obj.Attributes.Pointer) {
@@ -972,7 +971,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 				//cleanup if there was pointer
 				if (clean)
 					lcfree(clean);
-			} else if (obj.Address) {
+			} else {
 				//just copy data as usual to specific location
 				int32_t size = abs(obj.Size);
 				memcpy(obj.Address, object->Pointer, size);
@@ -1105,13 +1104,13 @@ void LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, ui
 	if (object == 0 || object->Address == 0)
 		return;
 	char* dataAddr = object->Address;
-//check that data is real
+	//check that data is real
 	if (dataAddr == 0 && object->Size != 0)
 		return;
-//extract pointer
+	//extract pointer
 	if (object->Attributes.Pointer)
 		dataAddr = *(char**) dataAddr;
-//negative size means this is string - any length
+	//negative size means this is string - any length
 	if ((object->Attributes.TCP) || (object->Size > 8) || ((object->Size < 0) && (strnlen(dataAddr, 8) == 8))) {
 		//avoid dual same id
 		objBuffered* txProceed = (objBuffered*) objTXbuf_start;
@@ -1231,20 +1230,20 @@ void LC_TransmitHandler(void) {
 }
 
 /// Call this function in loop get all active nodes. Ends when returns LC_Broadcast_Address
+/// @param n Pointer to stored position for search
 /// @return Returns active node short name
-LC_NodeShortName LC_GetActiveNodes(void) {
-	static int last_pos = 0;
-	int i = last_pos + 1;
+LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
+	int i = *last_pos + 1;
 	//new run
-	if (last_pos >= LEVCAN_MAX_TABLE_NODES)
+	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
 		i = 0;
 	//search
 	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID != LC_Broadcast_Address) {
-			last_pos = i;
+			*last_pos = i;
 			return node_table[i].ShortName;
 		}
 	}
-	last_pos = LEVCAN_MAX_TABLE_NODES;
+	*last_pos = LEVCAN_MAX_TABLE_NODES;
 	return (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address } ;
-		}
+}
