@@ -411,7 +411,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 				receiver->Param->ParamType = param_received->ParamType;
 				//receiver->Param->Index=param_received->Index; //should be equal
 				//extract name
-				//todo memfree for new parameteers
+				char* clean = receiver->Param->Name;
 				int strpos = 0;
 				if (param_received->Literals[0] != 0) {
 					int length = strlen(param_received->Literals);
@@ -421,8 +421,12 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 					strpos = length;
 				} else
 					receiver->Param->Name = 0;
+				//cleanup if there was pointer
+				if (clean)
+					lcfree(clean);
 				strpos++;				//skip one terminating character
 				//extract formatting
+				clean = receiver->Param->Formatting;
 				if (param_received->Literals[strpos] != 0) {
 					int length = strlen(&param_received->Literals[strpos]);
 					receiver->Param->Formatting = lcmalloc(length + 1);
@@ -431,6 +435,9 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 					strpos = length + 1;
 				} else
 					receiver->Param->Formatting = 0;
+				//cleanup if there was pointer
+				if (clean)
+					lcfree(clean);
 				//delete receiver
 				receiver->Param = 0;
 			}
@@ -486,12 +493,12 @@ void LC_ParametersPrintAll(void* vnode) {
 /// @param receiver_node Receiver ID node
 LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) {
 	//send function will use fast send, so it is  safe
-	storeValuePacked_t store= { 0 };
+	storeValuePacked_t store = { 0 };
 	store.Directory = dir;
 	store.Index = paramv->Index;
 	store.Value = paramv->Value;
 
-	LC_ObjectRecord_t record= { 0 };
+	LC_ObjectRecord_t record = { 0 };
 	record.Address = &store;
 	record.Attributes.TCP = 1;
 	record.Attributes.Priority = LC_Priority_Low;
