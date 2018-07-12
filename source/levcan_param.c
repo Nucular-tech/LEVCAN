@@ -36,10 +36,13 @@ typedef struct {
 
 typedef struct {
 	LC_ParameterValue_t* Param;
+	void* Node;
 	uint16_t Directory;
 	uint16_t Source;
+	uint8_t Full;
 } bufferedParam_t;
 
+//### Local functions ###
 LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
 uint16_t check_align(const LC_ParameterAdress_t* parameter);
 char* extractName(const LC_ParameterAdress_t* param);
@@ -49,10 +52,12 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory);
 int32_t getParameterValue(const LC_ParameterAdress_t* parameter);
 int setParameterValue(const LC_ParameterAdress_t* parameter, int32_t value);
 char* printParam(const LC_ParameterAdress_t* parameter);
-bufferedParam_t* findFreeRx(void);
+void proceed_RX(void);
 
+//### Local variables ###
 bufferedParam_t receive_buffer[LEVCAN_PARAM_QUEUE_SIZE];
-volatile int16_t receive_free;
+volatile uint16_t receiveFIFO_in = 0, receiveFIFO_out = 0;
+volatile uint16_t receive_busy = 0;
 
 char* extractName(const LC_ParameterAdress_t* param) {
 	char* source = 0;
@@ -73,9 +78,13 @@ char* extractName(const LC_ParameterAdress_t* param) {
 parameterValuePacked_t param_invalid = { .Index = 0, .Directory = 0, .ParamType = PT_invalid, .Literals = { 0, 0 } };
 
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
-	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
-		if (receive_buffer[i].Param != 0 && receive_buffer[i].Directory == dir && receive_buffer[i].Param->Index == index && receive_buffer[i].Source == source)
-			return &receive_buffer[i];
+	if (receiveFIFO_in != receiveFIFO_out) {
+		//receive_buffer[receiveFIFO_out]
+		receiveFIFO_out = (receiveFIFO_out + 1) % LEVCAN_PARAM_QUEUE_SIZE;
+
+		if (receive_buffer[receiveFIFO_out].Param != 0 && receive_buffer[receiveFIFO_out].Directory == dir && receive_buffer[receiveFIFO_out].Param->Index == index
+				&& receive_buffer[receiveFIFO_out].Source == source)
+			return &receive_buffer[receiveFIFO_out];
 	}
 	return 0;
 }
@@ -281,16 +290,6 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 	return -1;
 }
 
-bufferedParam_t* findFreeRx(void) {
-	int position = receive_free;
-	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
-		if (receive_buffer[(i + position) % LEVCAN_PARAM_QUEUE_SIZE].Param == 0) {
-			receive_free = (i + position + 1) % LEVCAN_PARAM_QUEUE_SIZE;
-			return &receive_buffer[(i + position) % LEVCAN_PARAM_QUEUE_SIZE];
-		}
-	}
-	return 0;
-}
 const LC_ObjectRecord_t nullrec;
 LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size) {
 
@@ -392,7 +391,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 		//somebody receiving
 		if (receiver) {
 			receiver->Param->Value = update->Value;
-			receiver->Param->ParamType &= ~PT_noinit;
+			receiver->Param->ParamType &= ~PT_reqval;
 			receiver->Param = 0;
 		}
 	}
@@ -446,6 +445,9 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 	}
 		break;
 	}
+	//get new now
+	receive_busy = 0;
+	proceed_RX();
 	return nullrec; // nothing to do so here
 }
 
@@ -515,46 +517,67 @@ LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sen
 /// @param full	0 - request just value, 1 - request full parameter information.
 LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full) {
 	LC_NodeDescription_t* node = sender_node;
-
-	bufferedParam_t* receive = findFreeRx();
-	if (receive == 0)
+	//todo reentrancy
+	if (receiveFIFO_in == ((receiveFIFO_out - 1 + LEVCAN_PARAM_QUEUE_SIZE) % LEVCAN_PARAM_QUEUE_SIZE))
 		return LC_BufferFull;
+
+	bufferedParam_t* receive = &receive_buffer[receiveFIFO_in];
 	receive->Param = paramv;
 	receive->Directory = dir;
 	receive->Source = receiver_node;
-
-	uint8_t data[3] = { 0 };
-	data[0] = paramv->Index;
-	data[1] = dir;
-	data[2] = 0;
-
-	LC_ObjectRecord_t record = { 0 };
-	record.Address = &data;
-	record.Attributes.TCP = 1;
-	record.Attributes.Priority = LC_Priority_Low;
+	receive->Full = full;
+	receive->Node = sender_node;
 
 	if (paramv->ParamType == PT_invalid)
 		paramv->ParamType = 0;
 
 	if (full) {
-		record.Size = 2;
 		paramv->ParamType |= PT_noinit;
 	} else {
-		record.Size = 3;
 		paramv->ParamType |= PT_reqval;
 	}
-	return LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
+	if (receive_busy == 0)
+		proceed_RX();
+	receiveFIFO_in = (receiveFIFO_in + 1) % LEVCAN_PARAM_QUEUE_SIZE;
+
+	return LC_Ok;
 }
 
 /// Stops all async updates of parameters
 void LC_ParametersStopUpdating(void) {
 	//clean up all tx buffers,
+	//todo thread safe
 	for (int i = 0; i < LEVCAN_PARAM_QUEUE_SIZE; i++) {
-		receive_buffer[i].Param = 0;
-		receive_buffer[i].Directory = 0;
-		receive_buffer[i].Source = 0;
+		receive_buffer[i] = (bufferedParam_t ) { 0 };
 	}
-	receive_free = 0;
+	receiveFIFO_in = 0;
+	receiveFIFO_out = 0;
+	receive_busy = 0;
+}
+
+void proceed_RX(void) {
+	if (receiveFIFO_in != receiveFIFO_out) {
+		//receive_buffer[receiveFIFO_out]
+
+		uint8_t data[3] = { 0 };
+		data[0] = receive_buffer[receiveFIFO_out].Param->Index;
+		data[1] = receive_buffer[receiveFIFO_out].Directory;
+		data[2] = 0;
+
+		LC_ObjectRecord_t record = { 0 };
+		record.Address = &data;
+		record.Attributes.TCP = 1;
+		record.Attributes.Priority = LC_Priority_Low;
+
+		if (receive_buffer[receiveFIFO_out].Full) {
+			record.Size = 2;
+		} else {
+			record.Size = 3;
+		}
+		//get next buffer index. sent in short mode
+		if (LC_SendMessage(receive_buffer[receiveFIFO_out].Node, &record, receive_buffer[receiveFIFO_out].Source, LC_SYS_Parameters) == 0)
+			receive_busy = 1;
+	}
 }
 
 /*
