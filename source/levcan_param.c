@@ -392,6 +392,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, voi
 		//somebody receiving
 		if (receiver) {
 			receiver->Param->Value = update->Value;
+			receiver->Param->ParamType &= ~PT_noinit;
 			receiver->Param = 0;
 		}
 	}

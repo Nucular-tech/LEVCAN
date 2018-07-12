@@ -558,7 +558,7 @@ void LC_NetworkManager(uint32_t time) {
 							memcpy(obj.Address, rxFIFO[rxFIFO_out].data, obj.Size);
 						}
 #ifdef LEVCAN_TRACE
-						trace_printf("RX fast finished:%d \n", hdr.MsgID);
+						//trace_printf("RX fast finished:%d \n", hdr.MsgID);
 #endif
 						if (hdr.Parity) {
 							//TCP End Of Message ACK fast
@@ -1003,7 +1003,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 				lcfree(object->Pointer);
 			}
 #ifdef LEVCAN_TRACE
-			trace_printf("RX finished:%d success\n", object->Header.MsgID);
+			//trace_printf("RX finished:%d success\n", object->Header.MsgID);
 #endif
 		} else {
 			//clean up memory buffer
