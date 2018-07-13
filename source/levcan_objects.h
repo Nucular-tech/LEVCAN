@@ -70,27 +70,27 @@ typedef struct {
 	int16_t Speed; //kmh
 } LC_Obj_Speed_t;
 
-typedef struct __attribute__((packed)){
+typedef struct {
 	int16_t ThrottleV; //mV
 	int16_t BrakeV; //mV
 	union {
-		struct {
-			unsigned Enable :1;
-			unsigned Brake :1;
-			unsigned Lock :1;
-			unsigned Speed1 :1;
-			unsigned Speed3 :1;
-			unsigned Reverse :1;
-			unsigned Cruise :1;
-			unsigned TurnRight :1;
-			unsigned TurnLeft :1;
-			unsigned Horn :1;
-			unsigned Button1 :1;
-			unsigned Button2 :1;
-			unsigned Button3 :1;
-			unsigned Button4 :1;
-			unsigned Button5 :1;
-			unsigned Button6 :1;
+		struct __attribute__((packed)){
+			unsigned int Enable :1;
+			unsigned int Brake :1;
+			unsigned int Lock :1;
+			unsigned int Speed1 :1;
+			unsigned int Speed3 :1;
+			unsigned int Reverse :1;
+			unsigned int Cruise :1;
+			unsigned int TurnRight :1;
+			unsigned int TurnLeft :1;
+			unsigned int Horn :1;
+			unsigned int Button1 :1;
+			unsigned int Button2 :1;
+			unsigned int Button3 :1;
+			unsigned int Button4 :1;
+			unsigned int Button5 :1;
+			unsigned int Button6 :1;
 		};
 		uint16_t Inputs;
 	};
