@@ -80,11 +80,12 @@ parameterValuePacked_t param_invalid = { .Index = 0, .Directory = 0, .ParamType 
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
 	if (receiveFIFO_in != receiveFIFO_out) {
 		//receive_buffer[receiveFIFO_out]
+		int out = receiveFIFO_out;
 		receiveFIFO_out = (receiveFIFO_out + 1) % LEVCAN_PARAM_QUEUE_SIZE;
 
-		if (receive_buffer[receiveFIFO_out].Param != 0 && receive_buffer[receiveFIFO_out].Directory == dir && receive_buffer[receiveFIFO_out].Param->Index == index
-				&& receive_buffer[receiveFIFO_out].Source == source)
-			return &receive_buffer[receiveFIFO_out];
+		if (receive_buffer[out].Param != 0 && receive_buffer[out].Directory == dir && receive_buffer[out].Param->Index == index
+				&& receive_buffer[out].Source == source)
+			return &receive_buffer[out];
 	}
 	return 0;
 }
@@ -536,9 +537,9 @@ LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, v
 	} else {
 		paramv->ParamType |= PT_reqval;
 	}
+	receiveFIFO_in = (receiveFIFO_in + 1) % LEVCAN_PARAM_QUEUE_SIZE;
 	if (receive_busy == 0)
 		proceed_RX();
-	receiveFIFO_in = (receiveFIFO_in + 1) % LEVCAN_PARAM_QUEUE_SIZE;
 
 	return LC_Ok;
 }

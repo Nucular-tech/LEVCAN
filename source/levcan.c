@@ -437,6 +437,8 @@ void LC_ReceiveHandler(uint32_t time) {
 void LC_NetworkManager(uint32_t time) {
 
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
+		if (own_nodes[i].State == LCNodeState_Disabled)
+			continue;
 		//send every node id
 		if (own_nodes[i].State == LCNodeState_NetworkDiscovery) {
 			//check network discovery timeout
