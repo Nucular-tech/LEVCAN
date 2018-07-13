@@ -70,7 +70,7 @@ typedef struct {
 	int16_t Speed; //kmh
 } LC_Obj_Speed_t;
 
-typedef struct {
+typedef struct __attribute__((packed)){
 	int16_t ThrottleV; //mV
 	int16_t BrakeV; //mV
 	union {
@@ -95,7 +95,7 @@ typedef struct {
 		uint16_t Inputs;
 	};
 	uint16_t Timeout; //control timeout
-} LC_Obj_Controls_t;
+} LC_Obj_Controls_t ;
 
 typedef struct {
 	uint16_t WhUsed;
