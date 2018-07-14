@@ -62,7 +62,7 @@ extern int trace_printf(const char* format, ...);
 extern void *lcmalloc(uint32_t size);
 extern void lcfree(void *pointer);
 
-extern LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
+extern LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 //#### PRIVATE VARIABLES ####
 LC_NodeDescription_t own_nodes[LEVCAN_MAX_OWN_NODES];
 LC_NodeTable_t node_table[LEVCAN_MAX_TABLE_NODES];
@@ -80,11 +80,11 @@ volatile uint16_t own_node_count;
 void initialize(void);
 void configureFilters(void);
 void addAddressFilter(uint16_t address);
-int16_t compareNode(LC_NodeShortName a, LC_NodeShortName b);
+int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b);
 LC_NodeDescription_t* findNode(uint16_t nodeID);
 LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t* node, uint8_t read_write, uint8_t nodeID);
-headerPacked_t headerPack(LC_Header header);
-LC_Header headerUnpack(headerPacked_t header);
+headerPacked_t headerPack(LC_Header_t header);
+LC_Header_t headerUnpack(headerPacked_t header);
 void claimFreeID(LC_NodeDescription_t* node);
 LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length);
 uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg);
@@ -112,7 +112,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 		node.VendorName = 0;
 
 	LC_NodeDescription_t descr = { 0 };
-	LC_NodeShortName sname = { 0 };
+	LC_NodeShortName_t sname = { 0 };
 	sname.Configurable = node.Configurable;
 	sname.DeviceType = node.DeviceType;
 	sname.ManufacturerCode = node.ManufacturerCode;
@@ -218,7 +218,7 @@ int32_t getTXqueueSize(void) {
 		return txFIFO_in + (LEVCAN_TX_SIZE - txFIFO_out);
 }
 
-void LC_AddressClaimHandler(LC_NodeShortName node, uint16_t mode) {
+void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 	headerPacked_t header = { .Priority = ~LC_Priority_Control, .MsgID = LC_SYS_AddressClaimed, .Target = LC_Broadcast_Address, .Request = 0 };
 	uint32_t data[2];
 
@@ -372,7 +372,7 @@ void addAddressFilter(uint16_t address) {
 	CAN_CreateFilterMask((CAN_IR ) { .ToUint32 = reg.ToUint32 }, (CAN_IR ) { .ToUint32 = mask.ToUint32 }, 0);
 }
 
-int16_t compareNode(LC_NodeShortName a, LC_NodeShortName b) {
+int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 	int16_t i = 0;
 	for (; (i < 2) && (a.ToUint32[i] == b.ToUint32[i]); i++)
 		;
@@ -392,7 +392,7 @@ void LC_ReceiveHandler(void) {
 	while (CAN_Receive(&header.ToUint32, data, &length) == CANH_Ok) {
 
 		if (header.MsgID == LC_SYS_AddressClaimed) {
-			LC_Header uheader = headerUnpack(header);
+			LC_Header_t uheader = headerUnpack(header);
 			if (uheader.Request) {
 				//TODO what to do with null?
 				if (uheader.Target == LC_Broadcast_Address) {
@@ -417,7 +417,7 @@ void LC_ReceiveHandler(void) {
 				}
 			} else
 				//got some other claim
-				LC_AddressClaimHandler((LC_NodeShortName ) { .ToUint32[0] = data[0], .ToUint32[1] = data[1], .NodeID = uheader.Source }, LC_RX);
+				LC_AddressClaimHandler((LC_NodeShortName_t ) { .ToUint32[0] = data[0], .ToUint32[1] = data[1], .NodeID = uheader.Source }, LC_RX);
 		} else {
 			//buffer not full?
 			if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
@@ -505,7 +505,7 @@ void LC_NetworkManager(uint32_t time) {
 				if (obj.Attributes.Function && obj.Address) {
 					//function call before sending
 					//unpack header
-					LC_Header unpack = headerUnpack(hdr);
+					LC_Header_t unpack = headerUnpack(hdr);
 					//call object, return function should have processed record.
 					obj = ((LC_FunctionCall_t) obj.Address)(node, unpack, 0, 0);
 				}
@@ -538,7 +538,7 @@ void LC_NetworkManager(uint32_t time) {
 					if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
 						if (obj.Attributes.Function) {
 							//function call
-							LC_Header unpack = headerUnpack(hdr);
+							LC_Header_t unpack = headerUnpack(hdr);
 							//call
 							((LC_FunctionCall_t) obj.Address)(node, unpack, rxFIFO[rxFIFO_out].data, rxFIFO[rxFIFO_out].length);
 						} else if (obj.Attributes.Pointer) {
@@ -733,7 +733,7 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 	lcfree(obj);
 }
 
-headerPacked_t headerPack(LC_Header header) {
+headerPacked_t headerPack(LC_Header_t header) {
 	headerPacked_t hdr;
 	hdr.RTS_CTS = header.RTS_CTS;
 	hdr.MsgID = header.MsgID;
@@ -745,8 +745,8 @@ headerPacked_t headerPack(LC_Header header) {
 	return hdr;
 }
 
-LC_Header headerUnpack(headerPacked_t header) {
-	LC_Header hdr;
+LC_Header_t headerUnpack(headerPacked_t header) {
+	LC_Header_t hdr;
 	hdr.RTS_CTS = header.RTS_CTS;
 	hdr.MsgID = header.MsgID;
 	hdr.Parity = header.Parity;
@@ -978,7 +978,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 			if (obj.Attributes.Function) {
 				//function call
 				//unpack header
-				LC_Header unpack = headerUnpack(object->Header);
+				LC_Header_t unpack = headerUnpack(object->Header);
 				//call
 				((LC_FunctionCall_t) obj.Address)(node, unpack, object->Pointer, object->Position);
 				//cleanup
@@ -1236,7 +1236,7 @@ void LC_TransmitHandler(void) {
 /// Call this function in loop get all active nodes. Ends when returns LC_Broadcast_Address
 /// @param n Pointer to stored position for search
 /// @return Returns active node short name
-LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
+LC_NodeShortName_t LC_GetActiveNodes(int* last_pos) {
 	int i = *last_pos;
 	//new run
 	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
@@ -1249,10 +1249,18 @@ LC_NodeShortName LC_GetActiveNodes(int* last_pos) {
 		}
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
-	LC_NodeShortName ret = (LC_NodeShortName ) { .NodeID = LC_Broadcast_Address };
+	LC_NodeShortName_t ret = (LC_NodeShortName_t ) { .NodeID = LC_Broadcast_Address };
 	return ret;
 } //
-
+/// Returns own node short name, containing actual ID
+/// @param mynode pointer to node, can be 0 for default node
+/// @return LC_NodeShortName
+LC_NodeShortName_t LC_GetMyNodeName(void* mynode) {
+	LC_NodeDescription_t* node = mynode;
+	if (node == 0)
+		node = &own_nodes[0];
+	return node->ShortName;
+}
 /*
  LC_Object_t* findObject(uint16_t index, int32_t size, nodeDescription* node) {
  LC_Object_t* rec = 0;

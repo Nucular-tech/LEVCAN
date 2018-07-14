@@ -43,7 +43,7 @@ typedef struct {
 } bufferedParam_t;
 
 //### Local functions ###
-LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
+LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 uint16_t check_align(const LC_ParameterAdress_t* parameter);
 char* extractName(const LC_ParameterAdress_t* param);
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
@@ -293,7 +293,7 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 }
 
 const LC_ObjectRecord_t nullrec;
-LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size) {
+LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 
 	LC_ObjectRecord_t txrec={0};
 	txrec.Attributes.Priority = LC_Priority_Low;

@@ -32,7 +32,7 @@ int LC_FileOpen(LC_File_t* fp, char* name, uint16_t server_node, uint16_t mode) 
 		//look for any server node
 		while (1) {
 			int counter = 0;
-			LC_NodeShortName node = LC_GetActiveNodes(&counter);
+			LC_NodeShortName_t node = LC_GetActiveNodes(&counter);
 			if (node.NodeID == LC_Broadcast_Address)
 				return 1; //nothing found
 			if (node.FileServer) {

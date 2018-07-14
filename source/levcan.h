@@ -50,7 +50,7 @@ typedef struct {
 		unsigned RTS_CTS :1;
 		unsigned Priority :2;
 	};
-} LC_Header;
+} LC_Header_t;
 
 typedef struct {
 	union {
@@ -68,7 +68,7 @@ typedef struct {
 		};
 	};
 	uint16_t NodeID;
-} LC_NodeShortName;
+} LC_NodeShortName_t;
 
 typedef struct {
 	char* NodeName;
@@ -115,7 +115,7 @@ typedef struct {
 	char* DeviceName;
 	char* VendorName;
 	uint32_t Serial;
-	LC_NodeShortName ShortName;
+	LC_NodeShortName_t ShortName;
 	uint32_t LastTXtime;
 	uint16_t LastID;
 	enum {
@@ -129,11 +129,11 @@ typedef struct {
 } LC_NodeDescription_t;
 
 typedef struct {
-	LC_NodeShortName ShortName;
+	LC_NodeShortName_t ShortName;
 	uint32_t LastRXtime;
 } LC_NodeTable_t;
 
-typedef LC_ObjectRecord_t (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size);
+typedef LC_ObjectRecord_t (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
@@ -152,7 +152,7 @@ enum {
 };
 
 uintptr_t* LC_CreateNode(LC_NodeInit_t node);
-void LC_AddressClaimHandler(LC_NodeShortName node, uint16_t mode);
+void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode);
 void LC_ReceiveHandler(void);
 void LC_NetworkManager(uint32_t time);
 LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
@@ -160,4 +160,5 @@ LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 LC_Return_t LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
-LC_NodeShortName LC_GetActiveNodes(int* last_pos);
+LC_NodeShortName_t LC_GetActiveNodes(int* last_pos);
+LC_NodeShortName_t LC_GetMyNodeName(void* mynode);
