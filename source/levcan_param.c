@@ -83,8 +83,7 @@ bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
 		int out = receiveFIFO_out;
 		receiveFIFO_out = (receiveFIFO_out + 1) % LEVCAN_PARAM_QUEUE_SIZE;
 
-		if (receive_buffer[out].Param != 0 && receive_buffer[out].Directory == dir && receive_buffer[out].Param->Index == index
-				&& receive_buffer[out].Source == source)
+		if (receive_buffer[out].Param != 0 && receive_buffer[out].Directory == dir && receive_buffer[out].Param->Index == index && receive_buffer[out].Source == source)
 			return &receive_buffer[out];
 	}
 	return 0;
@@ -179,6 +178,8 @@ char* printParam(const LC_ParameterAdress_t* parameter) {
 		else
 			strcat(line, "OFF\n");
 	}
+		break;
+	default:
 		break;
 	}
 
@@ -294,7 +295,7 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 const LC_ObjectRecord_t nullrec;
 LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header header, void* data, int32_t size) {
 
-	LC_ObjectRecord_t txrec;
+	LC_ObjectRecord_t txrec={0};
 	txrec.Attributes.Priority = LC_Priority_Low;
 	txrec.Attributes.TCP = 1;
 	if (data == 0)

@@ -466,7 +466,6 @@ void LC_NetworkManager(uint32_t time) {
 		} else if (own_nodes[i].ShortName.NodeID == LC_Null_Address) {
 			//we've lost id, get new one
 			//look for free id
-			//todo add delay or detect network on startup
 			own_nodes[i].LastTXtime = 0;
 			claimFreeID(&own_nodes[i]);
 		} else if (own_nodes[i].ShortName.NodeID < LC_Broadcast_Address) {
@@ -497,9 +496,6 @@ void LC_NetworkManager(uint32_t time) {
 
 	while (rxFIFO_in != rxFIFO_out) {
 		//proceed RX FIFO
-		//rxFIFO[rxBuffer_out].data[0];
-		//rxFIFO[rxBuffer_out].data[1];
-		//rxFIFO[rxBuffer_out].length;
 		headerPacked_t hdr = rxFIFO[rxFIFO_out].header;
 		if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
@@ -564,7 +560,7 @@ void LC_NetworkManager(uint32_t time) {
 #endif
 						if (hdr.Parity) {
 							//TCP End Of Message ACK fast
-							headerPacked_t hdrtx;
+							headerPacked_t hdrtx = { 0 };
 							hdrtx.EoM = 1; //end of message
 							hdrtx.RTS_CTS = 0;
 							hdrtx.Priority = hdr.Priority;
@@ -588,34 +584,33 @@ void LC_NetworkManager(uint32_t time) {
 						rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 						continue;
 					}
+					//data alloc
 					newRXobj->Pointer = lcmalloc(32);
 					if (newRXobj->Pointer == 0) {
 						lcfree(newRXobj);
-						//get next buffer index
-						rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
-						continue;
-					}
-					newRXobj->Length = 32;
-					newRXobj->Header = hdr;
-					newRXobj->Flags.TCP = hdr.Parity; //setup rx mode
-					newRXobj->Position = 0;
-					newRXobj->Attempt = 0;
-					newRXobj->Time_since_comm = 0;
-					newRXobj->Next = 0;
-					newRXobj->Previous = 0;
-					//not critical here
-					if (objRXbuf_start == 0) {
-						//no objects in rx array
-						objRXbuf_start = newRXobj;
-						objRXbuf_end = newRXobj;
 					} else {
-						//add to the end
-						newRXobj->Previous = (intptr_t*) objRXbuf_end;
-						objRXbuf_end->Next = (intptr_t*) newRXobj;
-						objRXbuf_end = newRXobj;
+						newRXobj->Length = 32;
+						newRXobj->Header = hdr;
+						newRXobj->Flags.TCP = hdr.Parity; //setup rx mode
+						newRXobj->Position = 0;
+						newRXobj->Attempt = 0;
+						newRXobj->Time_since_comm = 0;
+						newRXobj->Next = 0;
+						newRXobj->Previous = 0;
+						//not critical here
+						if (objRXbuf_start == 0) {
+							//no objects in rx array
+							objRXbuf_start = newRXobj;
+							objRXbuf_end = newRXobj;
+						} else {
+							//add to the end
+							newRXobj->Previous = (intptr_t*) objRXbuf_end;
+							objRXbuf_end->Next = (intptr_t*) newRXobj;
+							objRXbuf_end = newRXobj;
+						}
+						//	trace_printf("New RX object created:%d\n", newRXobj->Header.MsgID);
+						objectRXproceed(newRXobj, &rxFIFO[rxFIFO_out]);
 					}
-					//	trace_printf("New RX object created:%d\n", newRXobj->Header.MsgID);
-					objectRXproceed(newRXobj, &rxFIFO[rxFIFO_out]);
 				}
 			} else {
 				//	trace_printf("Data input:%d\n", hdr.MsgID);
@@ -652,6 +647,9 @@ void LC_NetworkManager(uint32_t time) {
 #ifdef LEVCAN_TRACE
 			trace_printf("TX object deleted by timeout:%d\n", txProceed->Header.MsgID);
 #endif
+			//tx may have memfree request
+			if (txProceed->Flags.TXcleanup)
+				lcfree(txProceed->Pointer);
 			deleteObject(txProceed, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
 		}
 		txProceed = next;
