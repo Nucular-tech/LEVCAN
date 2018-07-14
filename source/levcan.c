@@ -82,7 +82,6 @@ void configureFilters(void);
 void addAddressFilter(uint16_t address);
 int16_t compareNode(LC_NodeShortName a, LC_NodeShortName b);
 LC_NodeDescription_t* findNode(uint16_t nodeID);
-LC_Object_t* findObject(uint16_t index, int32_t size, LC_NodeDescription_t* node);
 LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t* node, uint8_t read_write, uint8_t nodeID);
 headerPacked_t headerPack(LC_Header header);
 LC_Header headerUnpack(headerPacked_t header);
@@ -385,7 +384,7 @@ int16_t compareNode(LC_NodeShortName a, LC_NodeShortName b) {
 		return 1;
 }
 
-void LC_ReceiveHandler(uint32_t time) {
+void LC_ReceiveHandler(void) {
 	static headerPacked_t header;
 	static uint32_t data[2];
 	static uint16_t length;
@@ -692,7 +691,7 @@ void LC_NetworkManager(uint32_t time) {
 #if (LEVCAN_MAX_TABLE_NODES) > 0
 	//now look for dead nodes...
 	static uint32_t offline_tick = 0;
-	const int off_period = 250; //0.25s
+	const uint16_t off_period = 250; //0.25s
 	offline_tick += time;
 	if (offline_tick > off_period) {
 		for (int i = 0; i < LEVCAN_MAX_TABLE_NODES; i++) {

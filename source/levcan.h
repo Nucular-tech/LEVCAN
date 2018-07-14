@@ -153,7 +153,7 @@ enum {
 
 uintptr_t* LC_CreateNode(LC_NodeInit_t node);
 void LC_AddressClaimHandler(LC_NodeShortName node, uint16_t mode);
-void LC_ReceiveHandler(uint32_t tick);
+void LC_ReceiveHandler(void);
 void LC_NetworkManager(uint32_t time);
 LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
 LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);

@@ -2,6 +2,17 @@
 
 #pragma once
 
+typedef enum {
+	LC_Device_Unknown = 0,
+	LC_Device_BMS = 0x2,
+	LC_Device_Controller = 0x4,
+	LC_Device_Display = 0x8,
+	LC_Device_Light = 0x10,
+	LC_Device_RemoteControl = 0x20,
+	LC_Device_Misc = 0x40,
+	LC_Device_Debug = 0x80,
+} LC_Device_t;
+
 enum {
 	LC_Obj_State = 0x300,
 	LC_Obj_SupplyVoltage,
