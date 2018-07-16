@@ -486,7 +486,7 @@ void LC_NetworkManager(uint32_t time) {
 							if (own_nodes[i].State == LCNodeState_Online)
 								own_nodes[i].LastTXtime = 0; //reset online timer
 							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
-							return;
+							break;
 						}
 					}
 				}
