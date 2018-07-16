@@ -390,47 +390,16 @@ void LC_ReceiveHandler(void) {
 	static uint16_t length;
 //fast receive to clear input buffer, handle later in manager
 	while (CAN_Receive(&header.ToUint32, data, &length) == CANH_Ok) {
-
-		if (header.MsgID == LC_SYS_AddressClaimed) {
-			LC_Header_t uheader = headerUnpack(header);
-			if (uheader.Request) {
-				//TODO what to do with null?
-				if (uheader.Target == LC_Broadcast_Address) {
-					//send every node id
-					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
-						if (own_nodes[i].ShortName.NodeID < LC_Null_Address && own_nodes[i].State >= LCNodeState_WaitingClaim) {
-							if (own_nodes[i].State == LCNodeState_Online)
-								own_nodes[i].LastTXtime = 0; //reset online timer
-							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
-						}
-					}
-				} else {
-					//single node
-					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
-						if (own_nodes[i].ShortName.NodeID == uheader.Target && own_nodes[i].State >= LCNodeState_WaitingClaim) {
-							if (own_nodes[i].State == LCNodeState_Online)
-								own_nodes[i].LastTXtime = 0; //reset online timer
-							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
-							return;
-						}
-					}
-				}
-			} else
-				//got some other claim
-				LC_AddressClaimHandler((LC_NodeShortName_t ) { .ToUint32[0] = data[0], .ToUint32[1] = data[1], .NodeID = uheader.Source }, LC_RX);
-		} else {
-			//buffer not full?
-			if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
-				continue;
-			//store in rx buffer
-			rxFIFO[rxFIFO_in].data[0] = data[0];
-			rxFIFO[rxFIFO_in].data[1] = data[1];
-			rxFIFO[rxFIFO_in].length = length;
-			rxFIFO[rxFIFO_in].header = header;
-			rxFIFO_in = (rxFIFO_in + 1) % LEVCAN_RX_SIZE;
-		}
+		//buffer not full?
+		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
+			continue;
+		//store in rx buffer
+		rxFIFO[rxFIFO_in].data[0] = data[0];
+		rxFIFO[rxFIFO_in].data[1] = data[1];
+		rxFIFO[rxFIFO_in].length = length;
+		rxFIFO[rxFIFO_in].header = header;
+		rxFIFO_in = (rxFIFO_in + 1) % LEVCAN_RX_SIZE;
 	}
-
 }
 
 void LC_NetworkManager(uint32_t time) {
@@ -496,7 +465,37 @@ void LC_NetworkManager(uint32_t time) {
 	while (rxFIFO_in != rxFIFO_out) {
 		//proceed RX FIFO
 		headerPacked_t hdr = rxFIFO[rxFIFO_out].header;
-		if (hdr.Request) {
+		//fix threading
+		if (hdr.MsgID == LC_SYS_AddressClaimed) {
+			LC_Header_t uheader = headerUnpack(hdr);
+			if (uheader.Request) {
+				//TODO what to do with null?
+				if (uheader.Target == LC_Broadcast_Address) {
+					//send every node id
+					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
+						if (own_nodes[i].ShortName.NodeID < LC_Null_Address && own_nodes[i].State >= LCNodeState_WaitingClaim) {
+							if (own_nodes[i].State == LCNodeState_Online)
+								own_nodes[i].LastTXtime = 0; //reset online timer
+							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
+						}
+					}
+				} else {
+					//single node
+					for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
+						if (own_nodes[i].ShortName.NodeID == uheader.Target && own_nodes[i].State >= LCNodeState_WaitingClaim) {
+							if (own_nodes[i].State == LCNodeState_Online)
+								own_nodes[i].LastTXtime = 0; //reset online timer
+							LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
+							return;
+						}
+					}
+				}
+			} else
+				//got some other claim
+				LC_AddressClaimHandler(
+						(LC_NodeShortName_t ) { .ToUint32[0] = rxFIFO[rxFIFO_out].data[0], .ToUint32[1] =rxFIFO[rxFIFO_out].data[1], .NodeID = uheader.Source },
+						LC_RX);
+		} else if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
 				//Remote transfer request, try to create new TX object
 				LC_NodeDescription_t* node = findNode(hdr.Target);
