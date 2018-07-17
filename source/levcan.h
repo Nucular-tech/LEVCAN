@@ -107,6 +107,7 @@ enum {
 	LC_SYS_FileIO,
 	LC_SYS_Trace,
 	LC_SYS_DateTime,
+	LC_SYS_SWUpdate,
 	LC_SYS_End,
 };
 
