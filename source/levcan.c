@@ -720,13 +720,15 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 		((objBuffered*) obj->Previous)->Next = obj->Next; //junction
 	else {
 		(*start) = (objBuffered*) obj->Next; //Starting
-		(*start)->Previous = 0;
+		if ((*start) != 0)
+			(*start)->Previous = 0;
 	}
 	if (obj->Next) {
 		((objBuffered*) obj->Next)->Previous = obj->Previous;
 	} else {
 		(*end) = (objBuffered*) obj->Previous; //ending
-		(*start)->Next = 0;
+		if ((*end) != 0)
+			(*end)->Next = 0;
 	}
 //free this object
 	lcfree(obj);
