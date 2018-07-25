@@ -458,11 +458,11 @@ void LC_NetworkManager(uint32_t time) {
 #ifdef LEVCAN_TRACE
 					if (alone == 0) {
 						trace_printf("Are we alone?:%d\n", own_nodes[i].ShortName.NodeID);
-						alone = 2;
 					}
+					alone = 2000;
 #endif
 				} else if (alone)
-					alone--;
+					alone -= time;
 			}
 		}
 	}
@@ -502,19 +502,32 @@ void LC_NetworkManager(uint32_t time) {
 						LC_RX);
 		} else if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
-				//Remote transfer request, try to create new TX object
-				LC_NodeDescription_t* node = findNode(hdr.Target);
-				LC_ObjectRecord_t obj = findObjectRecord(hdr.MsgID, rxFIFO[rxFIFO_out].length, node, Read, hdr.Source);
-
-				if (obj.Attributes.Function && obj.Address) {
-					//function call before sending
-					//unpack header
-					LC_Header_t unpack = headerUnpack(hdr);
-					//call object, return function should have processed record.
-					obj = ((LC_FunctionCall_t) obj.Address)(node, unpack, 0, 0);
+				//check for existing objects
+				objBuffered* txProceed = (objBuffered*) objTXbuf_start;
+				while (txProceed) {
+					if ((txProceed->Header.MsgID == hdr.MsgID) && (txProceed->Header.Target == hdr.Source))
+						break;
+					txProceed = ((objBuffered*) txProceed->Next);
 				}
-				obj.Attributes.TCP |= hdr.Parity; //force TCP mode if requested
-				LC_SendMessage((intptr_t*) node, &obj, hdr.Source, hdr.MsgID);
+				if (txProceed == 0) {
+					//Remote transfer request, try to create new TX object
+					LC_NodeDescription_t* node = findNode(hdr.Target);
+					LC_ObjectRecord_t obj = findObjectRecord(hdr.MsgID, rxFIFO[rxFIFO_out].length, node, Read, hdr.Source);
+
+					if (obj.Attributes.Function && obj.Address) {
+						//function call before sending
+						//unpack header
+						LC_Header_t unpack = headerUnpack(hdr);
+						//call object, return function should have processed record.
+						obj = ((LC_FunctionCall_t) obj.Address)(node, unpack, 0, 0);
+					}
+					obj.Attributes.TCP |= hdr.Parity; //force TCP mode if requested
+					LC_SendMessage((intptr_t*) node, &obj, hdr.Source, hdr.MsgID);
+				} else {
+#ifdef LEVCAN_TRACE
+					//	trace_printf("RX dual request denied:%d, from node:%d \n", hdr.MsgID, hdr.Source);
+#endif
+				}
 			} else {
 				//find existing TX object
 				objBuffered* TXobj = (objBuffered*) objTXbuf_start;
@@ -814,9 +827,11 @@ uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t* ownNode) {
 }
 
 LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length) {
-
-	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE))
+	lc_disable_irq();
+	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE)) {
+		lc_enable_irq();
 		return LC_BufferFull;
+	}
 
 	int empty = 0;
 	if (txFIFO_in == txFIFO_out)
@@ -833,7 +848,7 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 	}
 
 	txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
-
+	lc_enable_irq();
 //proceed queue if we can do;
 	if (empty)
 		LC_TransmitHandler();
