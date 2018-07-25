@@ -295,7 +295,7 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 const LC_ObjectRecord_t nullrec;
 LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 
-	LC_ObjectRecord_t txrec={0};
+	LC_ObjectRecord_t txrec = { 0 };
 	txrec.Attributes.Priority = LC_Priority_Low;
 	txrec.Attributes.TCP = 1;
 	if (data == 0)
@@ -346,7 +346,9 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 			txrec.Size = totalsize;
 			txrec.Attributes.Cleanup = 1;
 
-			LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters);
+			if (LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters)) {
+				lcfree(param_to_send);
+			}
 		} else {
 			//non existing item
 			param_invalid.Index = pdindex;

@@ -449,15 +449,20 @@ void LC_NetworkManager(uint32_t time) {
 #endif
 				}
 			} else if (own_nodes[i].State == LCNodeState_Online) {
+				static int alone = 0;
 				//we are online! why nobody asking for it?
 				own_nodes[i].LastTXtime += time;
 				if (own_nodes[i].LastTXtime > 1250) {
 					own_nodes[i].LastTXtime = 0;
 					LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
 #ifdef LEVCAN_TRACE
-					trace_printf("Are we alone?:%d\n", own_nodes[i].ShortName.NodeID);
+					if (alone == 0) {
+						trace_printf("Are we alone?:%d\n", own_nodes[i].ShortName.NodeID);
+						alone = 2;
+					}
 #endif
-				}
+				} else if (alone)
+					alone--;
 			}
 		}
 	}
@@ -716,9 +721,13 @@ void LC_NetworkManager(uint32_t time) {
 }
 
 void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
+	lc_disable_irq();
 	if (obj->Previous)
 		((objBuffered*) obj->Previous)->Next = obj->Next; //junction
 	else {
+		if ((*start) != obj) {
+			trace_printf("Start object error");
+		}
 		(*start) = (objBuffered*) obj->Next; //Starting
 		if ((*start) != 0)
 			(*start)->Previous = 0;
@@ -726,10 +735,14 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 	if (obj->Next) {
 		((objBuffered*) obj->Next)->Previous = obj->Previous;
 	} else {
+		if ((*end) != obj) {
+			trace_printf("End object error");
+		}
 		(*end) = (objBuffered*) obj->Previous; //ending
 		if ((*end) != 0)
 			(*end)->Next = 0;
 	}
+	lc_enable_irq();
 //free this object
 	lcfree(obj);
 }
@@ -836,6 +849,8 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 			//TX finished? delete this buffer anyway
 #ifdef LEVCAN_TRACE
 			//trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
+			if (object->Position != object->Length)
+				trace_printf("TX TCP length mismatch:%d\n", object->Header.MsgID);
 #endif
 			//cleanup tx buffer also
 			if (object->Flags.TXcleanup)
@@ -1146,6 +1161,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 		newTXobj->Flags.TCP = object->Attributes.TCP;
 		newTXobj->Flags.TXcleanup = object->Attributes.Cleanup;
 		//todo TASK CRITICAL
+		lc_disable_irq();
 		if (objTXbuf_start == 0) {
 			//no objects in tx array
 			newTXobj->Previous = 0;
@@ -1157,6 +1173,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 			objTXbuf_end->Next = (intptr_t*) newTXobj;
 			objTXbuf_end = newTXobj;
 		}
+		lc_enable_irq();
 #ifdef LEVCAN_TRACE
 		//trace_printf("New TX object created:%d\n", newTXobj->Header.MsgID);
 #endif
