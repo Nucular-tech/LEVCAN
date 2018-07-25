@@ -115,7 +115,7 @@ void CAN_Init(uint32_t BTR) {
 	NVIC_SetPriority(CAN1_TX_IRQn, 15);
 	NVIC_EnableIRQ(CAN1_TX_IRQn);
 #endif
-#ifdef STM32F10X_MD || defined(STM32F30X)
+#if defined(STM32F10X_MD) || defined(STM32F30X)
 	NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 2);
 	NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
 	NVIC_SetPriority(CAN1_RX1_IRQn, 2);
@@ -403,7 +403,7 @@ void CAN1_TX_IRQHandler(void) {
 
 #endif
 
-#ifdef STM32F10X_MD || defined(STM32F30X)
+#if defined(STM32F10X_MD) || defined(STM32F30X)
 void USB_LP_CAN1_RX0_IRQHandler(void) {
 	LC_ReceiveHandler();
 }

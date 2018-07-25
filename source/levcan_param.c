@@ -414,14 +414,23 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 				receiver->Param->Value = param_received->Value;
 				receiver->Param->ParamType = param_received->ParamType;
 				//receiver->Param->Index=param_received->Index; //should be equal
+				int32_t maxstr = size - sizeof(parameterValuePacked_t);
+				int sizefail = 0;
 				//extract name
 				char* clean = receiver->Param->Name;
 				int strpos = 0;
 				if (param_received->Literals[0] != 0) {
-					int length = strlen(param_received->Literals);
+					int length = strnlen(param_received->Literals, 128);
+					if (length > maxstr) {
+						//broken size!
+						sizefail = 1;
+						length = maxstr;
+					}
 					receiver->Param->Name = lcmalloc(length + 1);
-					if (receiver->Param->Name)
-						strcpy(receiver->Param->Name, &param_received->Literals[strpos]);
+					if (receiver->Param->Name) {
+						strncpy(receiver->Param->Name, &param_received->Literals[strpos], length);
+						receiver->Param->Name[length] = 0; //terminate string
+					}
 					strpos = length;
 				} else
 					receiver->Param->Name = 0;
@@ -431,11 +440,18 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 				strpos++;				//skip one terminating character
 				//extract formatting
 				clean = receiver->Param->Formatting;
-				if (param_received->Literals[strpos] != 0) {
-					int length = strlen(&param_received->Literals[strpos]);
+				if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
+					int length = strnlen(&param_received->Literals[strpos], 128);
+					if (strpos + length > maxstr) {
+						//broken size!
+						sizefail = 1;
+						length = maxstr - strpos;
+					}
 					receiver->Param->Formatting = lcmalloc(length + 1);
-					if (receiver->Param->Formatting)
+					if (receiver->Param->Formatting) {
 						strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
+						receiver->Param->Formatting[length] = 0; //terminate string
+					}
 					strpos = length + 1;
 				} else
 					receiver->Param->Formatting = 0;
@@ -444,6 +460,11 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 					lcfree(clean);
 				//delete receiver
 				receiver->Param = 0;
+
+#ifdef LEVCAN_TRACE
+				if (sizefail)
+					trace_printf("Parameter RX size fail\n");
+#endif
 			}
 		}
 	}
