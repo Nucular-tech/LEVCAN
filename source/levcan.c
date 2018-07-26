@@ -28,7 +28,7 @@ typedef union {
 		unsigned Parity :1;
 		unsigned RTS_CTS :1;
 		unsigned Priority :2;
-	}__attribute__((packed));
+	}LEVCAN_PACKED;
 } headerPacked_t;
 
 typedef struct {
@@ -47,7 +47,7 @@ typedef struct {
 	struct {
 		unsigned TCP :1;
 		unsigned TXcleanup :1;
-	} Flags;
+	} Flags LEVCAN_PACKED;
 	intptr_t* Next;
 	intptr_t* Previous;
 } objBuffered;
@@ -92,6 +92,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request);
 void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end);
 int32_t getTXqueueSize(void);
 uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t* ownNode);
+objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source);
 //#### FUNCTIONS
 uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	initialize();
@@ -384,6 +385,19 @@ int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 		return 1;
 }
 
+objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
+	objBuffered* obj = array;
+	while (obj) {
+		//same source and same ID ?
+		//one ID&source can send only one message length a time
+		if (obj->Header.MsgID == msgID && obj->Header.Target == target && obj->Header.Source == source) {
+			return obj;
+		}
+		obj = (objBuffered*) obj->Next;
+	}
+	return 0;
+}
+
 void LC_ReceiveHandler(void) {
 	static headerPacked_t header;
 	static uint32_t data[2];
@@ -502,13 +516,8 @@ void LC_NetworkManager(uint32_t time) {
 						LC_RX);
 		} else if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
-				//check for existing objects
-				objBuffered* txProceed = (objBuffered*) objTXbuf_start;
-				while (txProceed) {
-					if ((txProceed->Header.MsgID == hdr.MsgID) && (txProceed->Header.Target == hdr.Source))
-						break;
-					txProceed = ((objBuffered*) txProceed->Next);
-				}
+				//check for existing objects, dual request denied
+				objBuffered* txProceed = findObject(objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
 				if (txProceed == 0) {
 					//Remote transfer request, try to create new TX object
 					LC_NodeDescription_t* node = findNode(hdr.Target);
@@ -530,26 +539,21 @@ void LC_NetworkManager(uint32_t time) {
 				}
 			} else {
 				//find existing TX object
-				objBuffered* TXobj = (objBuffered*) objTXbuf_start;
-				while (TXobj) {
-					objBuffered* next = (objBuffered*) TXobj->Next; //this obj may be lost in tx function
-					//same source and same ID ?
-					if (TXobj && TXobj->Header.MsgID == hdr.MsgID && TXobj->Header.Target == hdr.Source) {
-						//one source can send only one messageID a time
-						objectTXproceed(TXobj, &hdr);
-						break;
-					}
-					TXobj = next;
-				}
+				objBuffered* TXobj = findObject(objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
+				if (TXobj)
+					objectTXproceed(TXobj, &hdr);
 			}
 		} else {
 			//we got data
 			if (hdr.RTS_CTS) {
 				//address valid?
-				if (hdr.Source >= LC_Null_Address)
+				if (hdr.Source >= LC_Null_Address) {
+					//get next buffer index
+					rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 					continue;
-				if (hdr.EoM) {
-					//fast receive
+				}
+				if (hdr.EoM && hdr.Parity == 0) {
+					//fast receive for udp
 					LC_NodeDescription_t* node = findNode(hdr.Target);
 					LC_ObjectRecord_t obj = findObjectRecord(hdr.MsgID, rxFIFO[rxFIFO_out].length, node, Write, hdr.Source);
 					if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
@@ -571,28 +575,18 @@ void LC_NetworkManager(uint32_t time) {
 							//just copy data
 							memcpy(obj.Address, rxFIFO[rxFIFO_out].data, obj.Size);
 						}
-#ifdef LEVCAN_TRACE
-						//trace_printf("RX fast finished:%d \n", hdr.MsgID);
-#endif
-						if (hdr.Parity) {
-							//TCP End Of Message ACK fast
-							headerPacked_t hdrtx = { 0 };
-							hdrtx.EoM = 1; //end of message
-							hdrtx.RTS_CTS = 0;
-							hdrtx.Priority = hdr.Priority;
-							hdrtx.Source = hdr.Target; //we are target (receive)
-							hdrtx.Target = hdr.Source;
-							hdrtx.Request = 1;
-							hdrtx.MsgID = hdr.MsgID;
-							hdrtx.Parity = 1;
-							sendDataToQueue(hdrtx, 0, 0);
-						}
 					} else {
 #ifdef LEVCAN_TRACE
 						trace_printf("RX fast failed:%d \n", hdr.MsgID);
 #endif
 					}
 				} else {
+					//find existing RX object, delete in case we get new RequestToSend
+					objBuffered* RXobj = findObject(objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
+					if (RXobj) {
+						lcfree(RXobj->Pointer);
+						deleteObject(RXobj, &objRXbuf_start, &objRXbuf_end);
+					}
 					//create new receive object
 					objBuffered* newRXobj = (objBuffered*) lcmalloc(sizeof(objBuffered));
 					if (newRXobj == 0) {
@@ -629,26 +623,16 @@ void LC_NetworkManager(uint32_t time) {
 					}
 				}
 			} else {
-				//	trace_printf("Data input:%d\n", hdr.MsgID);
 				//find existing RX object
-				objBuffered* RXobj = (objBuffered*) objRXbuf_start;
-				while (RXobj) {
-					objBuffered* next = (objBuffered*) RXobj->Next; //this obj may be lost in receive function
-					//same source and same ID ?
-					//one ID&source can send only one message length a time
-					if (RXobj && RXobj->Header.MsgID == hdr.MsgID && RXobj->Header.Source == hdr.Source) {
-						objectRXproceed(RXobj, &rxFIFO[rxFIFO_out]);
-						break;
-					}
-					RXobj = next;
-				}
-
+				objBuffered* RXobj = findObject(objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
+				if (RXobj)
+					objectRXproceed(RXobj, &rxFIFO[rxFIFO_out]);
 			}
 		}
 		//get next buffer index
 		rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 	}
-//count work time and clean up
+	//count work time and clean up
 	objBuffered* txProceed = (objBuffered*) objTXbuf_start;
 	while (txProceed) {
 		objBuffered* next = (objBuffered*) txProceed->Next;
@@ -663,7 +647,7 @@ void LC_NetworkManager(uint32_t time) {
 #ifdef LEVCAN_TRACE
 			trace_printf("TX object deleted by timeout:%d\n", txProceed->Header.MsgID);
 #endif
-			//tx may have memfree request
+			//tx may have memfree requestyt z ltqx
 			if (txProceed->Flags.TXcleanup)
 				lcfree(txProceed->Pointer);
 			deleteObject(txProceed, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
@@ -730,7 +714,6 @@ void LC_NetworkManager(uint32_t time) {
 		offline_tick = offline_tick % off_period;
 	}
 #endif
-//vTaskDelay(250);
 }
 
 void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {

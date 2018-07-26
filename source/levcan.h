@@ -22,8 +22,8 @@ typedef union {
 		//received data will be saved as pointer to memory area, if there is already exists, it will be free
 		unsigned Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
 		unsigned Cleanup :1;	//after transmission pointer will call memfree
-	};
-} LC_ObjectAttributes_t;
+	} LEVCAN_PACKED;
+} LC_ObjectAttributes_t ;
 
 typedef struct {
 	uint16_t Index; //message id
@@ -82,7 +82,7 @@ typedef struct {
 		unsigned SWUpdates :1; //device may be updated
 		unsigned Events :1; //can send events to network
 		unsigned FileServer :1; //can proceed file io operations from other nodes
-	};
+	} LEVCAN_PACKED;
 	int16_t NodeID; //-1 will autodetect, 0-63 preffered address, 64-125 all
 	uint32_t Serial; //SN, used only 12bit
 	LC_Object_t* Objects; //CAN tx/rx user objects array
