@@ -96,7 +96,7 @@ objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint
 //#### FUNCTIONS
 uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	initialize();
-	//TODO add id network check on creation
+
 	if (node.NodeID < 0 || node.NodeID > 125) {
 		uint16_t id = node.Serial % 64;
 		id |= 64;
@@ -320,7 +320,7 @@ void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 		data[0] = node.ToUint32[0];
 		data[1] = node.ToUint32[1];
 	}
-	//TODO: it must be sent!?
+
 	sendDataToQueue(header, data, 8);
 }
 
@@ -385,7 +385,7 @@ int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 		return 1;
 }
 
-objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
+objBuffered* findObject( objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
 	objBuffered* obj = array;
 	while (obj) {
 		//same source and same ID ?
@@ -466,7 +466,7 @@ void LC_NetworkManager(uint32_t time) {
 				static int alone = 0;
 				//we are online! why nobody asking for it?
 				own_nodes[i].LastTXtime += time;
-				if (own_nodes[i].LastTXtime > 1250) {
+				if (own_nodes[i].LastTXtime > 2500) {
 					own_nodes[i].LastTXtime = 0;
 					LC_AddressClaimHandler(own_nodes[i].ShortName, LC_TX);
 #ifdef LEVCAN_TRACE
@@ -484,7 +484,6 @@ void LC_NetworkManager(uint32_t time) {
 	while (rxFIFO_in != rxFIFO_out) {
 		//proceed RX FIFO
 		headerPacked_t hdr = rxFIFO[rxFIFO_out].header;
-		//fix threading
 		if (hdr.MsgID == LC_SYS_AddressClaimed) {
 			LC_Header_t uheader = headerUnpack(hdr);
 			if (uheader.Request) {
@@ -517,6 +516,7 @@ void LC_NetworkManager(uint32_t time) {
 		} else if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
 				//check for existing objects, dual request denied
+				//ToDo is this best way? maybe reset tx?
 				objBuffered* txProceed = findObject(objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
 				if (txProceed == 0) {
 					//Remote transfer request, try to create new TX object
@@ -538,7 +538,7 @@ void LC_NetworkManager(uint32_t time) {
 #endif
 				}
 			} else {
-				//find existing TX object
+				//find existing TX object, tcp clear-to-send and end-of-msg-ack
 				objBuffered* TXobj = findObject(objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
 				if (TXobj)
 					objectTXproceed(TXobj, &hdr);
@@ -639,6 +639,7 @@ void LC_NetworkManager(uint32_t time) {
 
 		txProceed->Time_since_comm += time;
 		txProceed->Attempt = 0;
+		//ToDo do we need start timeout? how receiver will receive if tx tcp happen and did nothing more? change this function with receiver?
 		if (txProceed->Flags.TCP == 0) {
 			//UDP mode send data continuously
 			objectTXproceed(txProceed, 0);
@@ -775,7 +776,7 @@ void claimFreeID(LC_NodeDescription_t* node) {
 	}
 	if (freeid > LC_NodeFreeIDmax)
 		freeid = LC_NodeFreeIDmin;
-//todo fix endless loop
+	//todo fix endless loop
 	while (searchIndexCollision(freeid, node)) {
 		freeid++;
 		if (freeid > LC_NodeFreeIDmax)
@@ -789,7 +790,7 @@ void claimFreeID(LC_NodeDescription_t* node) {
 	LC_AddressClaimHandler(node->ShortName, LC_TX);
 	node->LastTXtime = 0;
 	node->State = LCNodeState_WaitingClaim;
-//add new own address filter TODO add later after verification
+	//add new own address filter TODO add later after verification
 	CAN_FilterEditOn();
 	addAddressFilter(freeid);
 	CAN_FilterEditOff();
@@ -848,7 +849,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 #ifdef LEVCAN_TRACE
 			//trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
 			if (object->Position != object->Length)
-				trace_printf("TX TCP length mismatch:%d\n", object->Header.MsgID);
+				trace_printf("TX TCP length mismatch:%d, it is:%d, it should:%d\n", object->Header.MsgID, object->Position, object->Length);
 #endif
 			//cleanup tx buffer also
 			if (object->Flags.TXcleanup)
@@ -897,10 +898,10 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 		}
 		//Extract new portion of data in obj. null length cant be
 		memcpy(data, &object->Pointer[object->Position], length);
-		//set data start only if not requested again, as this will create new buffer
-		if (object->Position == 0 && request == 0)
+		if (object->Position == 0) {
+			//Request new buffer anyway. maybe there was wrong request while data wasn't sent at all?
 			newhdr.RTS_CTS = 1;
-		else
+		} else
 			newhdr.RTS_CTS = 0;
 
 		newhdr.Parity = object->Flags.TCP ? parity : 0; //parity
@@ -914,7 +915,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 		object->Time_since_comm = 0; //data sent
 		//cycle if this is UDP till message end or buffer half fill
 	} while ((object->Flags.TCP == 0) && (getTXqueueSize() * 3 < LEVCAN_TX_SIZE * 4) && (object->Header.EoM == 0));
-//in UDP mode delete object when EoM is set
+	//in UDP mode delete object when EoM is set
 	if ((object->Flags.TCP == 0) && (object->Header.EoM == 1)) {
 		if (object->Flags.TXcleanup)
 			lcfree(object->Pointer);
@@ -1121,21 +1122,19 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 	if (object == 0 || object->Address == 0)
 		return LC_ObjectError;
 	char* dataAddr = object->Address;
-	//check that data is real
+//check that data is real
 	if (dataAddr == 0 && object->Size != 0)
 		return LC_DataError;
-	//extract pointer
+//extract pointer
 	if (object->Attributes.Pointer)
 		dataAddr = *(char**) dataAddr;
-	//negative size means this is string - any length
+//negative size means this is string - any length
 	if ((object->Attributes.TCP) || (object->Size > 8) || ((object->Size < 0) && (strnlen(dataAddr, 8) == 8))) {
 		//avoid dual same id
-		objBuffered* txProceed = (objBuffered*) objTXbuf_start;
-		while (txProceed) {
-			if ((txProceed->Header.MsgID == index) && (txProceed->Header.Target == target))
-				return LC_Collision;
-			txProceed = ((objBuffered*) txProceed->Next);
-		}
+		objBuffered* txProceed = findObject(objTXbuf_start, index, target, node->ShortName.NodeID);
+		if (txProceed)
+			return LC_Collision;
+
 		if (target == node->ShortName.NodeID)
 			return LC_Collision;
 		//form message header
@@ -1158,7 +1157,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t tar
 		newTXobj->Next = 0;
 		newTXobj->Flags.TCP = object->Attributes.TCP;
 		newTXobj->Flags.TXcleanup = object->Attributes.Cleanup;
-		//todo TASK CRITICAL
+
 		lc_disable_irq();
 		if (objTXbuf_start == 0) {
 			//no objects in tx array
@@ -1254,10 +1253,10 @@ void LC_TransmitHandler(void) {
 /// @return Returns active node short name
 LC_NodeShortName_t LC_GetActiveNodes(int* last_pos) {
 	int i = *last_pos;
-	//new run
+//new run
 	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
 		i = 0;
-	//search
+//search
 	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID != LC_Broadcast_Address) {
 			*last_pos = i + 1;
