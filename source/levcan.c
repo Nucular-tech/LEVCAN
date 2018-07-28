@@ -385,7 +385,7 @@ int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 		return 1;
 }
 
-objBuffered* findObject( objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
+objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
 	objBuffered* obj = array;
 	while (obj) {
 		//same source and same ID ?
@@ -636,22 +636,29 @@ void LC_NetworkManager(uint32_t time) {
 	objBuffered* txProceed = (objBuffered*) objTXbuf_start;
 	while (txProceed) {
 		objBuffered* next = (objBuffered*) txProceed->Next;
-
 		txProceed->Time_since_comm += time;
-		txProceed->Attempt = 0;
-		//ToDo do we need start timeout? how receiver will receive if tx tcp happen and did nothing more? change this function with receiver?
 		if (txProceed->Flags.TCP == 0) {
 			//UDP mode send data continuously
 			objectTXproceed(txProceed, 0);
-		} else if (txProceed->Time_since_comm > 1000) {
-			//TX timeout, make it free!
+		} else {
+			//TCP mode
+			if (txProceed->Time_since_comm > 100) {
+				if (txProceed->Attempt > 10) {
+					//TX timeout, make it free!
 #ifdef LEVCAN_TRACE
-			trace_printf("TX object deleted by timeout:%d\n", txProceed->Header.MsgID);
+					trace_printf("TX object deleted by attempt:%d\n", txProceed->Header.MsgID);
 #endif
-			//tx may have memfree requestyt z ltqx
-			if (txProceed->Flags.TXcleanup)
-				lcfree(txProceed->Pointer);
-			deleteObject(txProceed, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
+					if (txProceed->Flags.TXcleanup)
+						lcfree(txProceed->Pointer);
+					deleteObject(txProceed, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
+				} else {
+					// Try tx again
+					objectTXproceed(txProceed, 0);
+					//TOdo may cause buffer overflow if CAN is offline
+					if (txProceed->Time_since_comm == 0)
+						txProceed->Attempt++;
+				}
+			}
 		}
 		txProceed = next;
 	}
@@ -660,24 +667,7 @@ void LC_NetworkManager(uint32_t time) {
 	while (rxProceed) {
 		objBuffered* next = (objBuffered*) rxProceed->Next;
 		rxProceed->Time_since_comm += time;
-		if (rxProceed->Flags.TCP) {
-			//TCP mode
-			if (rxProceed->Time_since_comm > 100) {
-				if (rxProceed->Attempt > 10) {
-					//RX timeout, make it free!
-#ifdef LEVCAN_TRACE
-					trace_printf("RX object deleted by attempt:%d\n", rxProceed->Header.MsgID);
-#endif
-					lcfree(rxProceed->Pointer);
-					deleteObject(rxProceed, (objBuffered**) &objRXbuf_start, (objBuffered**) &objRXbuf_end);
-				} else {
-					//	trace_printf("Try again request: %d\n", rxProceed->Header.MsgID);
-					objectRXproceed(rxProceed, 0);
-					rxProceed->Attempt++;
-					rxProceed->Time_since_comm = 0;
-				}
-			}
-		} else if (rxProceed->Time_since_comm > 1000) {
+		if (rxProceed->Time_since_comm > 1000) {
 			//UDP mode rx timeout
 #ifdef LEVCAN_TRACE
 			trace_printf("RX object deleted by timeout:%d\n", rxProceed->Header.MsgID);
