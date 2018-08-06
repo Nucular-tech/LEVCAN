@@ -70,22 +70,23 @@ LC_NodeDescription_t* mynode;
 void nwrk_manager(void);
 void Init_LEVCAN(void) {
 	
-	CAN_InitFromClock(RCC_APB1_CLK, 1000, 2, 87);
+	CAN_InitFromClock(RCC_APB1_CLK, 1000, 2, 87); //default CAN speed 1Mhz, sample 87%, sjw=2
 	
-	LC_NodeInit_t node_init;
+	LC_NodeInit_t node_init = { 0 };
 
 	node_init.DeviceName = "Some Awesome Device";
-	node_init.NodeName = "NodeName";
+	node_init.NodeName = "Awesome Device Node"; //visible in device list from lcd
 	node_init.VendorName = "CompanyName LLC.";
 
-	node_init.VendorCode = 0xABCD;
+	node_init.ManufacturerCode = 0xABCD;
 	node_init.NodeID = 31; //default used ID if free
-	node_init.Serial = 0xDEADBEEF; //use your CPU SN
+	node_init.Serial = 0xDEADBEEF; //use your unique SN
+	node_init.DeviceType = LC_Device_Controller; //used for parsing devices over CAN bus
 
 	node_init.Objects = node_obj;
 	node_init.ObjectsSize = node_obj_size;
 
-	node_init.Configurable = 1; // we have configurable variables
+	node_init.Configurable = 1; // we have configurable variables (LC_ParameterDirectory_t)
 	node_init.Directories = paramDirectories;
 	node_init.DirectoriesSize = paramDirectoriesSize;
 	mynode = LC_CreateNode(node_init);
@@ -98,11 +99,9 @@ void Init_LEVCAN(void) {
 
 void nwrk_manager(void) {
 	while (1) {
-
-		LC_NetworkManager(configTICK_RATE_HZ / 100);
-
+		LC_NetworkManager(configTICK_RATE_HZ / 1000);
 		static uint32_t prev_upd_time_sp = 0;
-		vTaskDelayUntil(&prev_upd_time_sp, configTICK_RATE_HZ / 100); //100hz CAN
+		vTaskDelayUntil(&prev_upd_time_sp, configTICK_RATE_HZ / 1000); //100hz CAN
 	}
 }
 

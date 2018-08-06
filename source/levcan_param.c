@@ -205,9 +205,11 @@ int32_t getParameterValue(const LC_ParameterAdress_t* parameter) {
 		case VT_int32:
 			value = (*(int32_t*) parameter->Address);
 			break;
+#ifdef LEVCAN_USE_FLOAT
 		case VT_float:
 			value = (*(float*) parameter->Address) * powf(10, parameter->Decimal);
 			break;
+#endif
 		}
 	}
 	return value;
@@ -229,9 +231,11 @@ int setParameterValue(const LC_ParameterAdress_t* parameter, int32_t value) {
 		case VT_int32:
 			(*(uint32_t*) parameter->Address) = (uint32_t) value;
 			break;
+#ifdef LEVCAN_USE_FLOAT
 		case VT_float:
 			(*(float*) parameter->Address) = (float) value / powf(10, parameter->Decimal);
 			break;
+#endif
 		default:
 			break;
 		}
@@ -294,7 +298,9 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 
 const LC_ObjectRecord_t nullrec;
 LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
-
+#ifdef LEVCAN_MEM_STATIC
+	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = { 0 };
+#endif
 	LC_ObjectRecord_t txrec = { 0 };
 	txrec.Attributes.Priority = LC_Priority_Low;
 	txrec.Attributes.TCP = 1;
@@ -312,14 +318,24 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 		if (pddir < node->DirectoriesSize && pdindex < ((LC_ParameterDirectory_t*) node->Directories)[pddir].Size) {
 			int32_t namelength = 0, formatlength = 0;
 			//check strings
-			if (extractName(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]))
-				namelength = strlen(extractName(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]));
+			char* s_name = extractName(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]);
+			if (s_name)
+				namelength = strlen(s_name);
 			if (((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex].Formatting)
 				formatlength = strlen(((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex].Formatting);
 			//now allocate full size
+#ifdef LEVCAN_MEM_STATIC
+			parameterValuePacked_t* param_to_send = &static_buffer;
+			if (namelength + formatlength + 2 > 128) {
+				formatlength = 0;
+				if (namelength + 2 > 128)
+					namelength = 128 - 2;
+			}
+#endif
 			int32_t totalsize = sizeof(parameterValuePacked_t) + namelength + formatlength + 2;
+#ifndef LEVCAN_MEM_STATIC
 			parameterValuePacked_t* param_to_send = lcmalloc(totalsize);
-
+#endif
 			if (param_to_send == 0)
 				return nullrec; // nothing to do so here
 
@@ -336,18 +352,21 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 
 			param_to_send->Literals[0] = 0;
 			if (namelength)
-				strcat(param_to_send->Literals, extractName(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]));
+				strncat(param_to_send->Literals, extractName(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]), namelength);
 
 			param_to_send->Literals[namelength + 1] = 0; //next string start
 			if (formatlength)
-				strcat(&param_to_send->Literals[namelength + 1], ((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex].Formatting);
+				strncat(&param_to_send->Literals[namelength + 1], ((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex].Formatting, formatlength);
 
 			txrec.Address = param_to_send;
 			txrec.Size = totalsize;
+#ifndef LEVCAN_MEM_STATIC
 			txrec.Attributes.Cleanup = 1;
-
+#endif
 			if (LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters)) {
+#ifndef LEVCAN_MEM_STATIC
 				lcfree(param_to_send);
+#endif
 			}
 		} else {
 			//non existing item
@@ -400,74 +419,77 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 		}
 	}
 		break;
-	default: {
-		if (size > sizeof(parameterValuePacked_t)) {
-			//parameter full receive
-			parameterValuePacked_t* param_received = data;
-			bufferedParam_t* receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
-			//somebody receiving
-			if (receiver) {
-				receiver->Param->Decimal = param_received->Decimal;
-				receiver->Param->Min = param_received->Min;
-				receiver->Param->Max = param_received->Max;
-				receiver->Param->Step = param_received->Step;
-				receiver->Param->Value = param_received->Value;
-				receiver->Param->ParamType = param_received->ParamType;
-				//receiver->Param->Index=param_received->Index; //should be equal
-				int32_t maxstr = size - sizeof(parameterValuePacked_t);
-				int sizefail = 0;
-				//extract name
-				char* clean = receiver->Param->Name;
-				int strpos = 0;
-				if (param_received->Literals[0] != 0) {
-					int length = strnlen(param_received->Literals, 128);
-					if (length > maxstr) {
-						//broken size!
-						sizefail = 1;
-						length = maxstr;
-					}
-					receiver->Param->Name = lcmalloc(length + 1);
-					if (receiver->Param->Name) {
-						strncpy(receiver->Param->Name, &param_received->Literals[strpos], length);
-						receiver->Param->Name[length] = 0; //terminate string
-					}
-					strpos = length;
-				} else
+#ifndef LEVCAN_MEM_STATIC
+		//no receive for static memory
+		default: {
+			if (size > sizeof(parameterValuePacked_t)) {
+				//parameter full receive
+				parameterValuePacked_t* param_received = data;
+				bufferedParam_t* receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
+				//somebody receiving
+				if (receiver) {
+					receiver->Param->Decimal = param_received->Decimal;
+					receiver->Param->Min = param_received->Min;
+					receiver->Param->Max = param_received->Max;
+					receiver->Param->Step = param_received->Step;
+					receiver->Param->Value = param_received->Value;
+					receiver->Param->ParamType = param_received->ParamType;
+					//receiver->Param->Index=param_received->Index; //should be equal
+					int32_t maxstr = size - sizeof(parameterValuePacked_t);
+					int sizefail = 0;
+					//extract name
+					char* clean = receiver->Param->Name;
+					int strpos = 0;
+					if (param_received->Literals[0] != 0) {
+						int length = strnlen(param_received->Literals, 128);
+						if (length > maxstr) {
+							//broken size!
+							sizefail = 1;
+							length = maxstr;
+						}
+						receiver->Param->Name = lcmalloc(length + 1);
+						if (receiver->Param->Name) {
+							strncpy(receiver->Param->Name, &param_received->Literals[strpos], length);
+							receiver->Param->Name[length] = 0; //terminate string
+						}
+						strpos = length;
+					} else
 					receiver->Param->Name = 0;
-				//cleanup if there was pointer
-				if (clean)
+					//cleanup if there was pointer
+					if (clean)
 					lcfree(clean);
-				strpos++;				//skip one terminating character
-				//extract formatting
-				clean = receiver->Param->Formatting;
-				if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
-					int length = strnlen(&param_received->Literals[strpos], 128);
-					if (strpos + length > maxstr) {
-						//broken size!
-						sizefail = 1;
-						length = maxstr - strpos;
-					}
-					receiver->Param->Formatting = lcmalloc(length + 1);
-					if (receiver->Param->Formatting) {
-						strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
-						receiver->Param->Formatting[length] = 0; //terminate string
-					}
-					strpos = length + 1;
-				} else
+					strpos++;//skip one terminating character
+					//extract formatting
+					clean = receiver->Param->Formatting;
+					if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
+						int length = strnlen(&param_received->Literals[strpos], 128);
+						if (strpos + length > maxstr) {
+							//broken size!
+							sizefail = 1;
+							length = maxstr - strpos;
+						}
+						receiver->Param->Formatting = lcmalloc(length + 1);
+						if (receiver->Param->Formatting) {
+							strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
+							receiver->Param->Formatting[length] = 0; //terminate string
+						}
+						strpos = length + 1;
+					} else
 					receiver->Param->Formatting = 0;
-				//cleanup if there was pointer
-				if (clean)
+					//cleanup if there was pointer
+					if (clean)
 					lcfree(clean);
-				//delete receiver
-				receiver->Param = 0;
+					//delete receiver
+					receiver->Param = 0;
 
 #ifdef LEVCAN_TRACE
-				if (sizefail)
+					if (sizefail)
 					trace_printf("Parameter RX size fail\n");
 #endif
+				}
 			}
 		}
-	}
+#endif
 		break;
 	}
 	//get new now

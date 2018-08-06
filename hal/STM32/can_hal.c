@@ -33,7 +33,7 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 	else if (sjw <= 0)
 		sjw = 1;
 
-	trace_printf("CAN init, clock: %d, bitrate: %dkHz, SJW: %d, sample point: %d%%\n", PCLK, bitrate_khz, sjw, sample_point);
+	//trace_printf("CAN init, clock: %d, bitrate: %dkHz, SJW: %d, sample point: %d%%\n", PCLK, bitrate_khz, sjw, sample_point);
 	// for all possible BRP - bit rate prescaler registers do
 	for (int brpreg = 0; brpreg < max_brp; brpreg++) {
 		int brp = brpreg + 1;
@@ -75,8 +75,8 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 				// last part is CAN controller specific
 				btr = brp | ((t_seg1 - 1) << 16) | ((t_seg2 - 1) << 20) | ((sjw - 1) << 24);
 				// end for an entry with good accuracy
-				trace_printf("Prescaler: %d, ratio: %.2f, rratio: %d, accy: %.4f\n", brp, ratio, rratio, ((float) rratio - ratio));
-				trace_printf("tseg1: %d, tseg2: %d, sp: %.1f%%, brp: %d, tq num: %d \n", t_seg1, t_seg2, real_sp, brp, (1 + t_seg1 + t_seg2));
+				//trace_printf("Prescaler: %d, ratio: %.2f, rratio: %d, accy: %.4f\n", brp, ratio, rratio, ((float) rratio - ratio));
+				//trace_printf("tseg1: %d, tseg2: %d, sp: %.1f%%, brp: %d, tq num: %d \n", t_seg1, t_seg2, real_sp, brp, (1 + t_seg1 + t_seg2));
 				break; //done
 			}
 		}
@@ -85,7 +85,7 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 	if (btr)
 		CAN_Init(btr);
 	else {
-		trace_printf("Can init failed, no divider found");
+		//trace_printf("Can init failed, no divider found");
 #ifdef DEBUG
 		__BKPT();
 #endif
