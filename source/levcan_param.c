@@ -43,7 +43,7 @@ typedef struct {
 } bufferedParam_t;
 
 //### Local functions ###
-LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 uint16_t check_align(const LC_ParameterAdress_t* parameter);
 char* extractName(const LC_ParameterAdress_t* param);
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
@@ -296,8 +296,7 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 	return -1;
 }
 
-const LC_ObjectRecord_t nullrec;
-LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
 	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = { 0 };
 #endif
@@ -305,7 +304,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 	txrec.Attributes.Priority = LC_Priority_Low;
 	txrec.Attributes.TCP = 1;
 	if (data == 0)
-		return nullrec; // nothing to do so here
+		return; // nothing to do so here
 	//TODO add node filter
 	switch (size) {
 	case 2: {
@@ -337,7 +336,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 			parameterValuePacked_t* param_to_send = lcmalloc(totalsize);
 #endif
 			if (param_to_send == 0)
-				return nullrec; // nothing to do so here
+				return; // nothing to do so here
 
 			//just copy-paste
 			value = getParameterValue(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]);
@@ -495,7 +494,7 @@ LC_ObjectRecord_t proceedParam(LC_NodeDescription_t* node, LC_Header_t header, v
 	//get new now
 	receive_busy = 0;
 	proceed_RX();
-	return nullrec; // nothing to do so here
+	return; // nothing to do so here
 }
 
 /// Prints local parameters information

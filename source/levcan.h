@@ -135,7 +135,7 @@ typedef struct {
 	uint32_t LastRXtime;
 } LC_NodeTable_t;
 
-typedef LC_ObjectRecord_t (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+typedef void (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
