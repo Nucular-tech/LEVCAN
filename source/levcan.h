@@ -108,6 +108,7 @@ enum {
 	LC_SYS_Trace,
 	LC_SYS_DateTime,
 	LC_SYS_SWUpdate,
+	LC_SYS_Shutdown,
 	LC_SYS_End,
 };
 

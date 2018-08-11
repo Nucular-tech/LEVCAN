@@ -35,6 +35,7 @@ enum {
 	LC_Obj_MotorHalls,
 	LC_Obj_CellsV,
 	LC_Obj_CellMinMax,
+	LC_Obj_UserActivity,
 };
 
 typedef struct {
