@@ -1,5 +1,6 @@
 #include <stdint.h>
 
+#include "levcan_config.h"
 #pragma once
 
 typedef enum {
@@ -36,6 +37,7 @@ enum {
 	LC_Obj_CellsV,
 	LC_Obj_CellMinMax,
 	LC_Obj_UserActivity,
+	LC_Obj_ActiveFunctions,
 };
 
 typedef struct {
@@ -86,7 +88,7 @@ typedef struct {
 	int16_t ThrottleV; //mV
 	int16_t BrakeV; //mV
 	union {
-		struct __attribute__((packed)){
+		struct LEVCAN_PACKED {
 			unsigned int Enable :1;
 			unsigned int Brake :1;
 			unsigned int Lock :1;
@@ -107,7 +109,41 @@ typedef struct {
 		uint16_t Inputs;
 	};
 	uint16_t Timeout; //control timeout
-} LC_Obj_Controls_t ;
+} LC_Obj_Controls_t;
+
+typedef union {
+	struct LEVCAN_PACKED {
+		unsigned int Enable :1;
+		unsigned int Brake :1;
+		unsigned int Lock :1;
+		unsigned int Speed1 :1;
+		unsigned int Speed2 :1;
+		unsigned int Speed3 :1;
+		unsigned int Reverse :1;
+		unsigned int Cruise :1;
+		unsigned int TurnRight :1;
+		unsigned int TurnLeft :1;
+		unsigned int LowBeam :1;
+		unsigned int HighBeam :1;
+		unsigned int PedalAssist :1;
+		unsigned int ConverterMode :1;
+		unsigned int WheelDriveLock :1;
+		unsigned int BatteryUnlocked :1;
+		unsigned int MotorWarning :1;
+		unsigned int MotorFail :1;
+		unsigned int ControllerWarning :1;
+		unsigned int ControllerFail :1;
+		unsigned int LowBattery :1;
+		unsigned int BatteryWarning :1;
+		unsigned int BatteryFail :1;
+		unsigned int EBrakeLimited :1;
+		unsigned int EABS :1;
+		unsigned int Service :1;
+		unsigned int FanActive :1;
+		unsigned int HeaterActive :1;
+	};
+	uint32_t Functions[2];
+} LC_Obj_ActiveFunctions_t;
 
 typedef struct {
 	uint16_t WhUsed;
