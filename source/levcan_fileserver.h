@@ -1,7 +1,7 @@
 /*
  * levcan_fileserver.h
  *
- *  Created on: 16 Aug 2018 ã.
+ *  Created on: 16 Aug 2018
  *      Author: Vasiliy Sukhoparov (VasiliSk)
  */
 

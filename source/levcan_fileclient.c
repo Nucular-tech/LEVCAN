@@ -210,6 +210,57 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 	rxtoread[id].Buffer = 0;
 	return ret;
 }
+
+LC_FileResult_t LC_FileClose(void* sender_node, uint16_t server_node) {
+	uint16_t attempt;
+	LC_NodeShortName_t server;
+	//look for any server node
+	if (server_node == LC_Broadcast_Address)
+		server = LC_FindFileServer(0);
+	else
+		server = LC_GetNode(server_node);
+	//checks
+	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
+		return LC_NodeOffline;
+	//get index for array
+	int id = LC_GetMyNodeIndex(sender_node);
+	if (id < 0)
+		return LC_NodeOffline;
+
+	//create buffer
+	fOpClose_t closef;
+	closef.Operation = fOpClose;
+	//prepare message
+	LC_ObjectRecord_t rec = { 0 };
+	rec.Address = &closef;
+	rec.Size = sizeof(fOpClose_t);
+	rec.Attributes.TCP = 1;
+	rec.Attributes.Priority = LC_Priority_Low;
+	rec.NodeID = server.NodeID;
+	//reset ACK
+	rxack[id] = (fOpAck_t ) { 0 };
+	fpos[id] = 0;
+	attempt = 0;
+	for (attempt = 0; attempt < 3; attempt++) {
+		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
+		//send error?
+		if (sr) {
+			if (sr == LC_BufferFull)
+				return LC_FR_NetworkBusy;
+			if (sr == LC_MallocFail)
+				return LC_FR_MemoryFull;
+			return LC_FR_NetworkError;
+		}
+		//wait 100ms
+		for (int time = 0; time < 10; time++) {
+			lcdelay(10);
+			if (rxack[id].Operation == fOpAck)
+				return rxack[id].Error; //Finish!!
+		}
+	}
+	return LC_FR_NetworkTimeout;
+}
+
 /// Returns file server short name
 /// @param scnt Pointer to stored position for search, can be null
 /// @return LC_NodeShortName_t file server

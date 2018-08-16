@@ -24,7 +24,7 @@ extern void lcfree(void *pointer);
 
 typedef struct {
 	uint16_t Operation;
-	uint16_t ToBeRead;
+	uint16_t Size;
 	union {
 		int32_t Position;
 		LC_FileAccess_t Mode;
@@ -44,13 +44,14 @@ typedef struct {
 
 //extern functions
 extern LC_FileResult_t lcfopen(void** fileObject, char* name, LC_FileAccess_t mode);
-extern uint32_t lcftell(void* fileObject);
-extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
+extern int32_t lcftell(void* fileObject);
+extern LC_FileResult_t lcflseek(void* fileObject, int32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, int32_t bytesToRead, int32_t* bytesReaded);
 extern LC_FileResult_t lcfclose(void* fileObject);
 //private functions
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(void* sender, uint8_t node, uint16_t error);
+LC_FileResult_t deleteFSObject(fSrvObj* obj);
 //server request fifo
 fOpDataAdress_t fsFIFO[LEVCAN_MAX_TABLE_NODES];
 volatile uint16_t fsFIFO_in, fsFIFO_out;
@@ -78,7 +79,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		fOpOpen_t* fop = data;
 		//fill data
 		fsinput->Mode = fop->Mode;
-		fsinput->ToBeRead = 0;
+		fsinput->Size = 0;
 		//copy name to new buffer
 		size_t length = strlen(fop->Name) + 1;
 		char* name = lcmalloc(length);
@@ -93,10 +94,29 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	case fOpRead: {
 		fOpRead_t* fop = data;
 		fsinput->Position = fop->Position;
-		fsinput->ToBeRead = fop->ToBeRead;
+		fsinput->Size = fop->ToBeRead;
 		fsinput->Data = 0;
 		//add to fifo
 		gotfifo = 1;
+	}
+		break;
+	case fOpClose: {
+		fsinput->Position = 0;
+		fsinput->Size = 0;
+		fsinput->Data = 0;
+		//add to fifo
+		gotfifo = 1;
+	}
+		break;
+	case fOpLseek: {
+		if (size == sizeof(fOpLseek_t)) {
+			fOpLseek_t* fop = data;
+			fsinput->Position = fop->Position;
+			fsinput->Size = 0;
+			fsinput->Data = 0;
+			//add to fifo
+			gotfifo = 1;
+		}
 	}
 		break;
 	}
@@ -133,8 +153,11 @@ void LC_FileServer(uint32_t tick, void* server) {
 		switch (fsinput->Operation) {
 		case fOpOpen: {
 			if (findFile(fsinput->NodeID)) {
+				//free name
+				lcfree(fsinput->Data);
+				fsinput->Data = 0;
 				//already opened file
-				sendAck(server, fsinput->NodeID, LC_SYS_FileServer);
+				sendAck(server, fsinput->NodeID, LC_FR_TooManyOpenFiles);
 			} else {
 				void* file;
 				LC_FileResult_t res = lcfopen(&file, fsinput->Data, fsinput->Mode);
@@ -182,8 +205,9 @@ void LC_FileServer(uint32_t tick, void* server) {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened/created file for this node?
 			if (fileNode) {
+				fileNode->Timeout = 0;
 				//get current position
-				uint32_t filepos = lcftell(fileNode->FileObject);
+				int32_t filepos = lcftell(fileNode->FileObject);
 				LC_FileResult_t result = 0;
 				//try to move
 				if (fsinput->Position != filepos) {
@@ -195,7 +219,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 					sendAck(server, fsinput->NodeID, result);
 					continue;
 				}
-				uint32_t btr = fsinput->ToBeRead;
+				int32_t btr = fsinput->Size;
 				if (fsinput->Position != filepos)
 					btr = 0; //pointer not moved
 
@@ -221,9 +245,38 @@ void LC_FileServer(uint32_t tick, void* server) {
 			}
 		}
 			break;
+		case fOpClose: {
+			fSrvObj* fileNode = findFile(fsinput->NodeID);
+			//do we have opened file for this node?
+			LC_FileResult_t rslt = LC_FR_Ok;
+			if (fileNode)
+				rslt = deleteFSObject(fileNode);
+			sendAck(server, fsinput->NodeID, rslt);
 		}
-		//get next buffer index
-
+			break;
+		case fOpLseek: {
+			fSrvObj* fileNode = findFile(fsinput->NodeID);
+			//do we have opened file for this node?
+			LC_FileResult_t rslt = LC_FR_Denied;
+			if (fileNode)
+				rslt = lcflseek(fileNode->FileObject, fsinput->Position);
+			sendAck(server, fsinput->NodeID, rslt);
+		}
+			break;
+		}
+	}
+	static uint16_t timesec = 0;
+	timesec += tick;
+	if (timesec >= 1000) {
+		timesec -= 1000;
+		fSrvObj* next;
+		for (fSrvObj* obj = file_start; obj != 0; obj = next) {
+			next = (fSrvObj*) obj->Next;
+			obj->Timeout++;
+			//5 minute delete
+			if (obj->Timeout > 60 * 5)
+				deleteFSObject(obj);
+		}
 	}
 }
 
@@ -285,7 +338,7 @@ fSrvObj* findFile(uint8_t source) {
 	return 0;
 }
 
-void deleteFSObject(fSrvObj* obj) {
+LC_FileResult_t deleteFSObject(fSrvObj* obj) {
 	if (obj->Previous)
 		((fSrvObj*) obj->Previous)->Next = obj->Next; //junction
 	else {
@@ -310,6 +363,9 @@ void deleteFSObject(fSrvObj* obj) {
 		if (file_end != 0)
 			file_end->Next = 0;
 	}
-//free this object
+
+	LC_FileResult_t resul = lcfclose(obj->FileObject);
+	//free this object
 	lcfree(obj);
+	return resul;
 }

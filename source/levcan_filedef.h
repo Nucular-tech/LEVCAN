@@ -25,6 +25,15 @@ typedef struct {
 
 typedef struct {
 	uint16_t Operation;
+	int32_t Position;
+} fOpLseek_t;
+
+typedef struct {
+	uint16_t Operation;
+} fOpClose_t;
+
+typedef struct {
+	uint16_t Operation;
 	uint16_t Error;
 	uint32_t Position;
 } fOpAck_t;
