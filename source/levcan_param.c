@@ -298,7 +298,7 @@ int isParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
 
 void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
-	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = { 0 };
+	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = {0};
 #endif
 	LC_ObjectRecord_t txrec = { 0 };
 	txrec.Attributes.Priority = LC_Priority_Low;
@@ -328,7 +328,7 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 			if (namelength + formatlength + 2 > 128) {
 				formatlength = 0;
 				if (namelength + 2 > 128)
-					namelength = 128 - 2;
+				namelength = 128 - 2;
 			}
 #endif
 			int32_t totalsize = sizeof(parameterValuePacked_t) + namelength + formatlength + 2;
@@ -359,10 +359,11 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 
 			txrec.Address = param_to_send;
 			txrec.Size = totalsize;
+			txrec.NodeID = header.Source;
 #ifndef LEVCAN_MEM_STATIC
 			txrec.Attributes.Cleanup = 1;
 #endif
-			if (LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters)) {
+			if (LC_SendMessage(node, &txrec, LC_SYS_Parameters)) {
 #ifndef LEVCAN_MEM_STATIC
 				lcfree(param_to_send);
 #endif
@@ -373,8 +374,8 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 			param_invalid.Directory = pddir;
 			txrec.Address = &param_invalid;
 			txrec.Size = sizeof(parameterValuePacked_t) + 2;
-
-			LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters);
+			txrec.NodeID = header.Source;
+			LC_SendMessage(node, &txrec, LC_SYS_Parameters);
 			//trace_printf("Info ERR sent i:%d, d:%d\n", pdindex, pddir);
 		}
 	}
@@ -394,8 +395,9 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 
 			txrec.Address = &sendvalue;
 			txrec.Size = sizeof(storeValuePacked_t) + 1;
+			txrec.NodeID = header.Source;
 			//send back data value
-			LC_SendMessage(node, &txrec, header.Source, LC_SYS_Parameters);
+			LC_SendMessage(node, &txrec, LC_SYS_Parameters);
 		}
 	}
 		break;
@@ -420,74 +422,74 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 		break;
 #ifndef LEVCAN_MEM_STATIC
 		//no receive for static memory
-		default: {
-			if (size > sizeof(parameterValuePacked_t)) {
-				//parameter full receive
-				parameterValuePacked_t* param_received = data;
-				bufferedParam_t* receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
-				//somebody receiving
-				if (receiver) {
-					receiver->Param->Decimal = param_received->Decimal;
-					receiver->Param->Min = param_received->Min;
-					receiver->Param->Max = param_received->Max;
-					receiver->Param->Step = param_received->Step;
-					receiver->Param->Value = param_received->Value;
-					receiver->Param->ParamType = param_received->ParamType;
-					//receiver->Param->Index=param_received->Index; //should be equal
-					int32_t maxstr = size - sizeof(parameterValuePacked_t);
-					int sizefail = 0;
-					//extract name
-					char* clean = receiver->Param->Name;
-					int strpos = 0;
-					if (param_received->Literals[0] != 0) {
-						int length = strnlen(param_received->Literals, 128);
-						if (length > maxstr) {
-							//broken size!
-							sizefail = 1;
-							length = maxstr;
-						}
-						receiver->Param->Name = lcmalloc(length + 1);
-						if (receiver->Param->Name) {
-							strncpy(receiver->Param->Name, &param_received->Literals[strpos], length);
-							receiver->Param->Name[length] = 0; //terminate string
-						}
-						strpos = length;
-					} else
+	default: {
+		if (size > sizeof(parameterValuePacked_t)) {
+			//parameter full receive
+			parameterValuePacked_t* param_received = data;
+			bufferedParam_t* receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
+			//somebody receiving
+			if (receiver) {
+				receiver->Param->Decimal = param_received->Decimal;
+				receiver->Param->Min = param_received->Min;
+				receiver->Param->Max = param_received->Max;
+				receiver->Param->Step = param_received->Step;
+				receiver->Param->Value = param_received->Value;
+				receiver->Param->ParamType = param_received->ParamType;
+				//receiver->Param->Index=param_received->Index; //should be equal
+				int32_t maxstr = size - sizeof(parameterValuePacked_t);
+				int sizefail = 0;
+				//extract name
+				char* clean = receiver->Param->Name;
+				int strpos = 0;
+				if (param_received->Literals[0] != 0) {
+					int length = strnlen(param_received->Literals, 128);
+					if (length > maxstr) {
+						//broken size!
+						sizefail = 1;
+						length = maxstr;
+					}
+					receiver->Param->Name = lcmalloc(length + 1);
+					if (receiver->Param->Name) {
+						strncpy(receiver->Param->Name, &param_received->Literals[strpos], length);
+						receiver->Param->Name[length] = 0; //terminate string
+					}
+					strpos = length;
+				} else
 					receiver->Param->Name = 0;
-					//cleanup if there was pointer
-					if (clean)
+				//cleanup if there was pointer
+				if (clean)
 					lcfree(clean);
-					strpos++;//skip one terminating character
-					//extract formatting
-					clean = receiver->Param->Formatting;
-					if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
-						int length = strnlen(&param_received->Literals[strpos], 128);
-						if (strpos + length > maxstr) {
-							//broken size!
-							sizefail = 1;
-							length = maxstr - strpos;
-						}
-						receiver->Param->Formatting = lcmalloc(length + 1);
-						if (receiver->Param->Formatting) {
-							strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
-							receiver->Param->Formatting[length] = 0; //terminate string
-						}
-						strpos = length + 1;
-					} else
+				strpos++; //skip one terminating character
+				//extract formatting
+				clean = receiver->Param->Formatting;
+				if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
+					int length = strnlen(&param_received->Literals[strpos], 128);
+					if (strpos + length > maxstr) {
+						//broken size!
+						sizefail = 1;
+						length = maxstr - strpos;
+					}
+					receiver->Param->Formatting = lcmalloc(length + 1);
+					if (receiver->Param->Formatting) {
+						strcpy(receiver->Param->Formatting, &param_received->Literals[strpos]);
+						receiver->Param->Formatting[length] = 0; //terminate string
+					}
+					strpos = length + 1;
+				} else
 					receiver->Param->Formatting = 0;
-					//cleanup if there was pointer
-					if (clean)
+				//cleanup if there was pointer
+				if (clean)
 					lcfree(clean);
-					//delete receiver
-					receiver->Param = 0;
+				//delete receiver
+				receiver->Param = 0;
 
 #ifdef LEVCAN_TRACE
-					if (sizefail)
-					trace_printf("Parameter RX size fail\n");
+				if (sizefail)
+				trace_printf("Parameter RX size fail\n");
 #endif
-				}
 			}
 		}
+	}
 #endif
 		break;
 	}
@@ -552,7 +554,8 @@ LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sen
 	record.Attributes.TCP = 1;
 	record.Attributes.Priority = LC_Priority_Low;
 	record.Size = sizeof(storeValuePacked_t);
-	return LC_SendMessage(sender_node, &record, receiver_node, LC_SYS_Parameters);
+	record.NodeID = receiver_node; //receiver
+	return LC_SendMessage(sender_node, &record, LC_SYS_Parameters);
 }
 
 /// Asynchroniously updates parameter. Setup index and directory to get one.
@@ -614,6 +617,7 @@ void proceed_RX(void) {
 		record.Address = &data;
 		record.Attributes.TCP = 1;
 		record.Attributes.Priority = LC_Priority_Low;
+		record.NodeID = receive_buffer[receiveFIFO_out].Source;
 
 		if (receive_buffer[receiveFIFO_out].Full) {
 			record.Size = 2;
@@ -621,7 +625,7 @@ void proceed_RX(void) {
 			record.Size = 3;
 		}
 		//get next buffer index. sent in short mode
-		if (LC_SendMessage(receive_buffer[receiveFIFO_out].Node, &record, receive_buffer[receiveFIFO_out].Source, LC_SYS_Parameters) == 0)
+		if (LC_SendMessage(receive_buffer[receiveFIFO_out].Node, &record, LC_SYS_Parameters) == 0)
 			receive_busy = 1;
 	}
 }

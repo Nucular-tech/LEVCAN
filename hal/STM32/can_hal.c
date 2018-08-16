@@ -95,6 +95,7 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 /// Initialize CAN core
 /// @param BTR bitrate setting, calculate at http://www.bittiming.can-wiki.info/
 void CAN_Init(uint32_t BTR) {
+	CAN1->MCR |= CAN_MCR_RESET;
 	CAN1->MCR |= CAN_MCR_INRQ; //init can
 	while ((CAN1->MSR & CAN_MSR_INAK) == 0)
 		;
@@ -103,13 +104,13 @@ void CAN_Init(uint32_t BTR) {
 	CAN1->BTR = BTR; //calculated for 1mhz http://www.bittiming.can-wiki.info/
 	CAN1->MCR = CAN_MCR_TXFP; // normal mode, transmit by message order
 
-	CAN1->IER = CAN_IER_BOFIE | CAN_IER_EPVIE | CAN_IER_ERRIE | CAN_IER_FMPIE0 | CAN_IER_FMPIE1 | CAN_IER_TMEIE;
+	CAN1->IER = CAN_IER_BOFIE | CAN_IER_EPVIE | CAN_IER_ERRIE | CAN_IER_FMPIE0 /*| CAN_IER_FMPIE1 */| CAN_IER_TMEIE;
 
 #if defined(STM32F405xx) || defined(STM32F446xx)
 	NVIC_SetPriority(CAN1_RX0_IRQn, 14);
 	NVIC_EnableIRQ(CAN1_RX0_IRQn);
-	NVIC_SetPriority(CAN1_RX1_IRQn, 14);
-	NVIC_EnableIRQ(CAN1_RX1_IRQn);
+	//NVIC_SetPriority(CAN1_RX1_IRQn, 14);
+	//NVIC_EnableIRQ(CAN1_RX1_IRQn);
 	NVIC_SetPriority(CAN1_SCE_IRQn, 15);
 	NVIC_EnableIRQ(CAN1_SCE_IRQn);
 	NVIC_SetPriority(CAN1_TX_IRQn, 15);
@@ -118,8 +119,8 @@ void CAN_Init(uint32_t BTR) {
 #if defined(STM32F10X_MD) || defined(STM32F30X)
 	NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 2);
 	NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
-	NVIC_SetPriority(CAN1_RX1_IRQn, 2);
-	NVIC_EnableIRQ(CAN1_RX1_IRQn);
+	//NVIC_SetPriority(CAN1_RX1_IRQn, 2);
+	//NVIC_EnableIRQ(CAN1_RX1_IRQn);
 	NVIC_SetPriority(CAN1_SCE_IRQn, 3);
 	NVIC_EnableIRQ(CAN1_SCE_IRQn);
 	NVIC_SetPriority(USB_HP_CAN1_TX_IRQn, 3);

@@ -22,8 +22,8 @@ typedef union {
 		//received data will be saved as pointer to memory area, if there is already exists, it will be free
 		unsigned Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
 		unsigned Cleanup :1;	//after transmission pointer will call memfree
-	} LEVCAN_PACKED;
-} LC_ObjectAttributes_t ;
+	}LEVCAN_PACKED;
+} LC_ObjectAttributes_t;
 
 typedef struct {
 	uint16_t Index; //message id
@@ -82,7 +82,7 @@ typedef struct {
 		unsigned SWUpdates :1; //device may be updated
 		unsigned Events :1; //can send events to network
 		unsigned FileServer :1; //can proceed file io operations from other nodes
-	} LEVCAN_PACKED;
+	}LEVCAN_PACKED;
 	int16_t NodeID; //-1 will autodetect, 0-63 preffered address, 64-125 all
 	uint32_t Serial; //SN, used only 12bit
 	LC_Object_t* Objects; //CAN tx/rx user objects array
@@ -104,11 +104,12 @@ enum {
 	LC_SYS_Parameters,
 	LC_SYS_Variables,
 	LC_SYS_Events,
-	LC_SYS_FileIO,
 	LC_SYS_Trace,
 	LC_SYS_DateTime,
 	LC_SYS_SWUpdate,
 	LC_SYS_Shutdown,
+	LC_SYS_FileServer,
+	LC_SYS_FileClient,
 	LC_SYS_End,
 };
 
@@ -142,7 +143,7 @@ typedef enum {
 } LC_Priority_t;
 
 typedef enum {
-	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_NodeOffline, LC_MallocFail, LC_Collision
+	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout
 } LC_Return_t;
 
 enum {
@@ -157,10 +158,12 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node);
 void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode);
 void LC_ReceiveHandler(void);
 void LC_NetworkManager(uint32_t time);
-LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t target, uint16_t index);
+LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t index);
 LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 LC_Return_t LC_SendDiscoveryRequest(uint16_t target);
 void LC_TransmitHandler(void);
-LC_NodeShortName_t LC_GetActiveNodes(int* last_pos);
+LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos);
+LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
 LC_NodeShortName_t LC_GetMyNodeName(void* mynode);
+int16_t LC_GetMyNodeIndex(void* mynode);

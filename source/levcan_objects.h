@@ -38,6 +38,7 @@ enum {
 	LC_Obj_CellMinMax,
 	LC_Obj_UserActivity,
 	LC_Obj_ActiveFunctions,
+	LC_Obj_LightSensor,
 };
 
 typedef struct {
@@ -88,7 +89,7 @@ typedef struct {
 	int16_t ThrottleV; //mV
 	int16_t BrakeV; //mV
 	union {
-		struct LEVCAN_PACKED {
+		struct {
 			unsigned int Enable :1;
 			unsigned int Brake :1;
 			unsigned int Lock :1;
@@ -105,17 +106,18 @@ typedef struct {
 			unsigned int Button4 :1;
 			unsigned int Button5 :1;
 			unsigned int Button6 :1;
-		};
+		}LEVCAN_PACKED;
 		uint16_t Inputs;
 	};
 	uint16_t Timeout; //control timeout
 } LC_Obj_Controls_t;
 
 typedef union {
-	struct LEVCAN_PACKED {
+	struct {
 		unsigned int Enable :1;
-		unsigned int Brake :1;
 		unsigned int Lock :1;
+		unsigned int Throttle :1;
+		unsigned int Brake :1;
 		unsigned int Speed1 :1;
 		unsigned int Speed2 :1;
 		unsigned int Speed3 :1;
@@ -141,7 +143,7 @@ typedef union {
 		unsigned int Service :1;
 		unsigned int FanActive :1;
 		unsigned int HeaterActive :1;
-	};
+	}LEVCAN_PACKED;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
 
@@ -177,3 +179,8 @@ typedef struct {
 	int16_t CellMin; //mV
 	int16_t CellMax; //mV
 } LC_Obj_CellMinMax_t;
+
+typedef struct {
+	uint16_t Normalized; //0-1024
+	uint16_t SensorVoltage; //mV
+} LC_Obj_LightSensor_t;
