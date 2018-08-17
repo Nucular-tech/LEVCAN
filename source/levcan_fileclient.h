@@ -45,6 +45,7 @@ typedef enum {
 	LC_FR_NetworkError,			/* (21) Data corrupted during transmission */
 	LC_FR_NetworkBusy,			/* (22) Buffer full */
 	LC_FR_MemoryFull,			/* (23) Could not allocate data */
+	LC_FR_NodeOffline,				/* (24) Node disabled */
 } LC_FileResult_t;
 
 typedef struct {
@@ -53,6 +54,8 @@ typedef struct {
 } LC_FileAck_t;
 
 LC_NodeShortName_t LC_FindFileServer(uint16_t* scnt);
-LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node, uint16_t server_node);
-LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node, uint16_t server_node);
-LC_FileResult_t LC_FileClose(void* sender_node, uint16_t server_node) ;
+LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node, uint8_t server_node);
+LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node, uint8_t server_node);
+LC_FileResult_t LC_FileClose(void* sender_node, uint8_t server_node);
+LC_FileResult_t LC_FileLseek(void* sender_node, uint8_t server_node);
+uint32_t LC_FileTell(void* sender_node);

@@ -20,12 +20,12 @@ typedef struct {
 typedef struct {
 	uint16_t Operation;
 	uint16_t ToBeRead;
-	int32_t Position;
+	uint32_t Position;
 } fOpRead_t;
 
 typedef struct {
 	uint16_t Operation;
-	int32_t Position;
+	uint32_t Position;
 } fOpLseek_t;
 
 typedef struct {
@@ -41,14 +41,14 @@ typedef struct {
 typedef struct {
 	uint16_t Operation;
 	uint16_t Error;
-	int32_t Position;
+	uint32_t Position;
 	uint16_t TotalRead;
 	char Data[];
 } fOpData_t;
 
 typedef struct {
 	char* Buffer;
-	int32_t Position;
+	uint32_t Position;
 	uint16_t ReadBytes;
 	uint16_t Error;
 } fRead_t;

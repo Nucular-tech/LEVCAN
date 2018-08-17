@@ -19,7 +19,9 @@
 #endif
 //extern functions
 extern void *lcdelay(uint32_t time);
-// Private variables
+//private functions
+LC_FileResult_t lc_client_sendwait(void* data, uint16_t size, void* sender_node, uint8_t server);
+//private variables
 volatile fRead_t rxtoread[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile uint32_t fpos[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile fOpAck_t rxack[LEVCAN_MAX_OWN_NODES] = { 0 };
@@ -31,10 +33,12 @@ void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	switch (*op) {
 	case fOpAck: {
 		if (sizeof(fOpAck_t) == size) {
+			fOpAck_t* fac = data;
 			int id = LC_GetMyNodeIndex(node);
 			if (id >= 0) {
-				rxack[id].Error = ((fOpAck_t*) data)->Error;
-				rxack[id].Operation = ((fOpAck_t*) data)->Operation; //finish
+				rxack[id].Error = fac->Error;
+				rxack[id].Operation = fac->Operation; //finish
+				rxack[id].Position = fac->Position;
 			}
 		}
 	}
@@ -44,8 +48,8 @@ void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		int id = LC_GetMyNodeIndex(node);
 		//check if it is okay
 		if (id >= 0) {
-			if (rxtoread[id].Buffer != 0 && fop->TotalRead <= rxtoread[id].ReadBytes && rxtoread[id].Position == -1
-					&& size == (int32_t) (rxtoread[id].ReadBytes + sizeof(fOpData_t))) {
+			if (rxtoread[id].Buffer != 0 && fop->TotalRead <= rxtoread[id].ReadBytes && rxtoread[id].Position == UINT32_MAX
+					&& size == (int32_t) (fop->TotalRead + sizeof(fOpData_t))) {
 				memcpy(rxtoread[id].Buffer, fop->Data, fop->TotalRead);
 				rxtoread[id].ReadBytes = fop->TotalRead;
 				rxtoread[id].Error = fop->Error;
@@ -61,7 +65,13 @@ void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	}
 }
 
-LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node, uint16_t server_node) {
+/// Open/Create a file
+/// @param name File name
+/// @param mode Mode flags LC_FileAccess_t
+/// @param sender_node Own network node
+/// @param server_node Server id, can be LC_Broadcast_Address to find first one
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node, uint8_t server_node) {
 	uint16_t attempt;
 	LC_NodeShortName_t server;
 	//look for any server node
@@ -71,13 +81,13 @@ LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node,
 		server = LC_GetNode(server_node);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
-		return LC_NodeOffline;
+		return LC_FR_NodeOffline;
 	if (name == 0)
-		return LC_DataError;
+		return LC_FR_InvalidParameter;
 	//get index for array
 	int id = LC_GetMyNodeIndex(sender_node);
 	if (id < 0)
-		return LC_NodeOffline;
+		return LC_FR_NodeOffline;
 
 	int datasize = sizeof(fOpOpen_t) + strlen(name) + 1;
 	//create buffer
@@ -86,46 +96,24 @@ LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node,
 	//buffer tx file operation
 	fOpOpen_t* openf = (fOpOpen_t*) datasend;
 	openf->Operation = fOpOpen;
-	openf->Name[0] = 0;
 	strcpy(&openf->Name[0], name);
 	openf->Mode = mode;
-	//prepare message
-	LC_ObjectRecord_t rec = { 0 };
-	rec.Address = openf;
-	rec.Attributes.TCP = 1;
-	rec.Attributes.Priority = LC_Priority_Low;
-	rec.NodeID = server.NodeID;
-	rec.Size = datasize;
-	//reset ACK
-	rxack[id] = (fOpAck_t ) { 0 };
-	fpos[id] = 0;
-	attempt = 0;
-	for (attempt = 0; attempt < 3; attempt++) {
-		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
-		//send error?
-		if (sr) {
-			if (sr == LC_BufferFull)
-				return LC_FR_NetworkBusy;
-			if (sr == LC_MallocFail)
-				return LC_FR_MemoryFull;
-			return LC_FR_NetworkError;
-		}
-		//wait 100ms
-		for (int time = 0; time < 100; time++) {
-			lcdelay(100);
-			if (rxack[id].Operation == fOpAck)
-				return rxack[id].Error; //Finish!!
-		}
-	}
-	return LC_FR_NetworkTimeout;
+	return lc_client_sendwait(openf, datasize, sender_node, server_node);
 }
 
-LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node, uint16_t server_node) {
+/// Read data from the file
+/// @param buffer Buffer to store read data
+/// @param btr Number of bytes to read
+/// @param br Number of bytes read
+/// @param sender_node Own network node
+/// @param server_node Server id, can be LC_Broadcast_Address to find first one
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node, uint8_t server_node) {
 	uint16_t attempt;
 	LC_NodeShortName_t server;
 
 	if (br == 0 || buffer == 0)
-		return LC_DataError;
+		return LC_FR_InvalidParameter;
 	//look for any server node
 	if (server_node == LC_Broadcast_Address)
 		server = LC_FindFileServer(0);
@@ -133,11 +121,11 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 		server = LC_GetNode(server_node);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
-		return LC_NodeOffline;
+		return LC_FR_NodeOffline;
 
 	int id = LC_GetMyNodeIndex(sender_node);
 	if (id < 0)
-		return LC_NodeOffline;
+		return LC_FR_NodeOffline;
 
 	fOpRead_t readf;
 	readf.Operation = fOpRead;
@@ -154,7 +142,7 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 
 	for (uint32_t position = 0; position < btr;) {
 		uint32_t toreadnow = btr - position;
-		int32_t globalpos = position + fpos[id];
+		uint32_t globalpos = position + fpos[id];
 		//finish?
 		if (toreadnow == 0)
 			return LC_Ok;
@@ -182,20 +170,20 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 			break;
 		}
 		//wait 500ms
-		for (int time = 0; time < 50000; time++) {
-			lcdelay(10);
-			if (rxtoread[id].Position != -1)
+		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
+			lcdelay(1);
+			if (rxtoread[id].Position != UINT32_MAX)
 				break;
 		}
 		//just make some checks
-		if (rxtoread[id].Position >= 0 && rxtoread[id].Position == globalpos && rxtoread[id].ReadBytes <= toreadnow) {
+		if (rxtoread[id].Position != UINT32_MAX && rxtoread[id].Position == globalpos && rxtoread[id].ReadBytes <= toreadnow) {
 			//received something, data already filled, move pointers
 			position += rxtoread[id].ReadBytes;
 			*br += rxtoread[id].ReadBytes;
 			attempt = 0;
-
 			if (rxtoread[id].ReadBytes < toreadnow)
 				break; //receive finished
+
 		} else {
 			attempt++;
 			if (attempt > 3) {
@@ -215,8 +203,11 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 	return ret;
 }
 
-LC_FileResult_t LC_FileClose(void* sender_node, uint16_t server_node) {
-	uint16_t attempt;
+/// Close an open file
+/// @param sender_node Own network node
+/// @param server_node Server id, can be LC_Broadcast_Address to find first one
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileClose(void* sender_node, uint8_t server_node) {
 	LC_NodeShortName_t server;
 	//look for any server node
 	if (server_node == LC_Broadcast_Address)
@@ -225,44 +216,48 @@ LC_FileResult_t LC_FileClose(void* sender_node, uint16_t server_node) {
 		server = LC_GetNode(server_node);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
-		return LC_NodeOffline;
-	//get index for array
-	int id = LC_GetMyNodeIndex(sender_node);
-	if (id < 0)
-		return LC_NodeOffline;
-
+		return LC_FR_NodeOffline;
 	//create buffer
 	fOpClose_t closef;
 	closef.Operation = fOpClose;
-	//prepare message
-	LC_ObjectRecord_t rec = { 0 };
-	rec.Address = &closef;
-	rec.Size = sizeof(fOpClose_t);
-	rec.Attributes.TCP = 1;
-	rec.Attributes.Priority = LC_Priority_Low;
-	rec.NodeID = server.NodeID;
-	//reset ACK
-	rxack[id] = (fOpAck_t ) { 0 };
-	fpos[id] = 0;
-	attempt = 0;
-	for (attempt = 0; attempt < 3; attempt++) {
-		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
-		//send error?
-		if (sr) {
-			if (sr == LC_BufferFull)
-				return LC_FR_NetworkBusy;
-			if (sr == LC_MallocFail)
-				return LC_FR_MemoryFull;
-			return LC_FR_NetworkError;
-		}
-		//wait 100ms
-		for (int time = 0; time < 10; time++) {
-			lcdelay(10);
-			if (rxack[id].Operation == fOpAck)
-				return rxack[id].Error; //Finish!!
-		}
-	}
-	return LC_FR_NetworkTimeout;
+	return lc_client_sendwait(&closef, sizeof(fOpClose_t), sender_node, server_node);
+}
+
+///  Move read/write pointer, Expand size
+/// @param sender_node Own network node
+/// @param server_node Server id, can be LC_Broadcast_Address to find first one
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileLseek(void* sender_node, uint8_t server_node) {
+	LC_NodeShortName_t server;
+	//look for any server node
+	if (server_node == LC_Broadcast_Address)
+		server = LC_FindFileServer(0);
+	else
+		server = LC_GetNode(server_node);
+	//checks
+	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
+		return LC_FR_NodeOffline;
+	int id = LC_GetMyNodeIndex(sender_node);
+	if (id < 0)
+		return LC_NodeOffline;
+	//create buffer
+	fOpLseek_t closef;
+	closef.Operation = fOpLseek;
+	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpClose_t), sender_node, server_node);
+	if (rxack[id].Operation == fOpAck)
+		fpos[id] = rxack[id].Position; //update position
+	return result;
+}
+
+/// Get current read/write pointer
+/// @param sender_node Own network node
+/// @return Pointer to the open file.
+uint32_t LC_FileTell(void* sender_node) {
+	//checks
+	int id = LC_GetMyNodeIndex(sender_node);
+	if (id < 0)
+		return LC_NodeOffline;
+	return fpos[id];
 }
 
 /// Returns file server short name
@@ -281,4 +276,40 @@ LC_NodeShortName_t LC_FindFileServer(uint16_t* scnt) {
 	if (scnt)
 		*scnt = counter;
 	return node;
+}
+
+LC_FileResult_t lc_client_sendwait(void* data, uint16_t size, void* sender_node, uint8_t server) {
+	//get index for array
+	int id = LC_GetMyNodeIndex(sender_node);
+	if (id < 0)
+		return LC_NodeOffline;
+	//prepare message
+	LC_ObjectRecord_t rec = { 0 };
+	rec.Address = data;
+	rec.Size = size;
+	rec.Attributes.TCP = 1;
+	rec.Attributes.Priority = LC_Priority_Low;
+	rec.NodeID = server;
+	//reset ACK
+	rxack[id] = (fOpAck_t ) { 0 };
+	fpos[id] = 0;
+	uint16_t attempt = 0;
+	for (attempt = 0; attempt < 3; attempt++) {
+		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
+		//send error?
+		if (sr) {
+			if (sr == LC_BufferFull)
+				return LC_FR_NetworkBusy;
+			if (sr == LC_MallocFail)
+				return LC_FR_MemoryFull;
+			return LC_FR_NetworkError;
+		}
+		//wait
+		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
+			lcdelay(1);
+			if (rxack[id].Operation == fOpAck)
+				return rxack[id].Error; //Finish!
+		}
+	}
+	return LC_FR_NetworkTimeout;
 }
