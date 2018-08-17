@@ -344,7 +344,7 @@ void proceedAddressClaim(LC_NodeDescription_t* node, LC_Header_t header, void* d
 }
 
 void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
-	headerPacked_t header = { .Priority = ~LC_Priority_Control, .MsgID = LC_SYS_AddressClaimed, .Target = LC_Broadcast_Address, .Request = 0 };
+	headerPacked_t header = { .Priority = ~LC_Priority_Control, .MsgID = LC_SYS_AddressClaimed, .Target = LC_Broadcast_Address, .Request = 0, .RTS_CTS = 1, .EoM = 1 };
 	uint32_t data[2];
 
 	int ownfound = 0;
@@ -444,7 +444,6 @@ void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 		data[0] = node.ToUint32[0];
 		data[1] = node.ToUint32[1];
 	}
-
 	sendDataToQueue(header, data, 8);
 }
 
@@ -973,7 +972,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 #ifdef LEVCAN_TRACE
 			//trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
 			if (object->Position != object->Length)
-			trace_printf("TX TCP length mismatch:%d, it is:%d, it should:%d\n", object->Header.MsgID, object->Position, object->Length);
+				trace_printf("TX TCP length mismatch:%d, it is:%d, it should:%d\n", object->Header.MsgID, object->Position, object->Length);
 #endif
 #ifndef LEVCAN_MEM_STATIC
 			//cleanup tx buffer also
@@ -998,7 +997,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 				object->Position = 0; //just in case... WTF
 			parity = ~((object->Position + 7) / 8) & 1; //parity
 #ifdef LEVCAN_TRACE
-					// trace_printf("TX object parity lost:%d position:%d\n", object->Header.MsgID, object->Position);
+			// trace_printf("TX object parity lost:%d position:%d\n", object->Header.MsgID, object->Position);
 #endif
 		} else {
 #ifdef LEVCAN_TRACE
