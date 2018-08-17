@@ -3,7 +3,7 @@ Light Electric Vehicle CAN protocol
 
 Some ideas taken from J1939 and CanOpen
 
-Uses 29bit CAN network and (currently) FreeRTOS functionality
+Uses 29bit CAN network (1MBps default), check dev branches for latest builds.
 
 Features
 ----------------
@@ -11,10 +11,22 @@ Features
  - Multiple nodes supported for one device
  - Dynamic network address
  - Configurable parameters for devices
+ - Simple file i/o with file server
+ - Static and dynamic memory supported
  - Up to 125 devices on bus
  - 10 bit message ID + length matching
  - Broadcast and adressed messages
 
+Planned (todo)
+----------------
+- Data bus abstraction layer, bridges between different buses
+- Make possible own node requests (frontend and backend in single node)
+- Better TCP message
+- Sockets?
+- Something like CANOPEN Service Data Object (SDO) protocol, where you can ask node to repeately send some objects
+
+Low level info
+----------------
 Each message that is sent by a Node contains source address. There are 128 possible addresses: 
  - 0..126 – Valid source addresses for Node 
  - 0..63 – Used for Node with Preferred Addresses
