@@ -11,13 +11,13 @@
 #include "levcan_config.h"
 
 typedef enum {
-	LC_FA_Read, 			// Specifies read access to the object. Data can be read from the file.
-	LC_FA_Write, // Specifies write access to the object. Data can be written to the file. Combine with LC_FA_Read for read-write access.
-	LC_FA_OpenExisting, // Opens the file. The function fails if the file is not existing. (Default)
-	LC_FA_CreateNew, // Creates a new file. The function fails with FR_EXIST if the file is existing.
-	LC_FA_CreateAlways, // Creates a new file. If the file is existing, it will be truncated and overwritten.
-	LC_FA_OpenAlways, //	Opens the file if it is existing. If not, a new file will be created.
-	LC_FA_OpenAppend, // Same as LC_FA_OpenAlways except the read/write pointer is set end of the file.
+	LC_FA_Read = 0x01, 			// Specifies read access to the object. Data can be read from the file.
+	LC_FA_Write = 0x02, 		// Specifies write access to the object. Data can be written to the file. Combine with LC_FA_Read for read-write access.
+	LC_FA_OpenExisting = 0x00, 	// Opens the file. The function fails if the file is not existing. (Default)
+	LC_FA_CreateNew = 0x04, 	// Creates a new file. The function fails with FR_EXIST if the file is existing.
+	LC_FA_CreateAlways = 0x08, 	// Creates a new file. If the file is existing, it will be truncated and overwritten.
+	LC_FA_OpenAlways = 0x10, 	// Opens the file if it is existing. If not, a new file will be created.
+	LC_FA_OpenAppend = 0x30, 	// Same as LC_FA_OpenAlways except the read/write pointer is set end of the file.
 } LC_FileAccess_t;
 
 typedef enum {

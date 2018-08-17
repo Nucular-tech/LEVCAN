@@ -44,9 +44,9 @@ void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		int id = LC_GetMyNodeIndex(node);
 		//check if it is okay
 		if (id >= 0) {
-			if (rxtoread[id].Buffer != 0 && fop->TotalRead <= rxtoread[id].ReadBytes && rxtoread[id].Position == INT32_MAX
+			if (rxtoread[id].Buffer != 0 && fop->TotalRead <= rxtoread[id].ReadBytes && rxtoread[id].Position == -1
 					&& size == (int32_t) (rxtoread[id].ReadBytes + sizeof(fOpData_t))) {
-				memcpy(rxtoread[id].Buffer, data, fop->TotalRead);
+				memcpy(rxtoread[id].Buffer, fop->Data, fop->TotalRead);
 				rxtoread[id].ReadBytes = fop->TotalRead;
 				rxtoread[id].Error = fop->Error;
 				rxtoread[id].Position = fop->Position; //trigger
@@ -111,8 +111,8 @@ LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node,
 			return LC_FR_NetworkError;
 		}
 		//wait 100ms
-		for (int time = 0; time < 10; time++) {
-			lcdelay(10);
+		for (int time = 0; time < 100; time++) {
+			lcdelay(100);
 			if (rxack[id].Operation == fOpAck)
 				return rxack[id].Error; //Finish!!
 		}
@@ -126,12 +126,12 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 
 	if (br == 0 || buffer == 0)
 		return LC_DataError;
-//look for any server node
+	//look for any server node
 	if (server_node == LC_Broadcast_Address)
 		server = LC_FindFileServer(0);
 	else
 		server = LC_GetNode(server_node);
-//checks
+	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
 		return LC_NodeOffline;
 
@@ -147,7 +147,7 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 	rec.NodeID = server.NodeID;
 	rec.Address = &readf;
 	rec.Size = sizeof(fOpRead_t);
-//reset
+	//reset
 	*br = 0;
 	attempt = 0;
 	LC_FileResult_t ret = LC_FR_Ok;
@@ -175,13 +175,14 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 		if (sr) {
 			if (sr == LC_BufferFull)
 				ret = LC_FR_NetworkBusy;
-			if (sr == LC_MallocFail)
+			else if (sr == LC_MallocFail)
 				ret = LC_FR_MemoryFull;
-			ret = LC_FR_NetworkError;
+			else
+				ret = LC_FR_NetworkError;
 			break;
 		}
 		//wait 500ms
-		for (int time = 0; time < 500; time++) {
+		for (int time = 0; time < 50000; time++) {
 			lcdelay(10);
 			if (rxtoread[id].Position != -1)
 				break;
@@ -191,7 +192,9 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 			//received something, data already filled, move pointers
 			position += rxtoread[id].ReadBytes;
 			*br += rxtoread[id].ReadBytes;
-			if (rxtoread[id].ReadBytes <= toreadnow)
+			attempt = 0;
+
+			if (rxtoread[id].ReadBytes < toreadnow)
 				break; //receive finished
 		} else {
 			attempt++;
@@ -201,12 +204,13 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 			}
 		}
 		//got some errs?
-		if (rxtoread[id].Error) {
+		if (rxtoread[id].Error && rxtoread[id].Error != LC_FR_NetworkError) {
 			ret = rxtoread[id].Error;
 			break;
 		}
 	}
 	//reset buffer
+	fpos[id] += *br;
 	rxtoread[id].Buffer = 0;
 	return ret;
 }

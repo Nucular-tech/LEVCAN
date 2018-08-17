@@ -255,7 +255,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	if (proceedFileClient != lc_default_handler) {
 		//File client
 		objparam = &own_nodes[i].SystemObjects[sysinx++];
-		objparam->Address = proceedFileServer;
+		objparam->Address = proceedFileClient;
 		objparam->Attributes.Writable = 1;
 		objparam->Attributes.Function = 1;
 		objparam->Attributes.TCP = 1;
@@ -596,7 +596,7 @@ void LC_NetworkManager(uint32_t time) {
 					if (alone == 0) {
 						trace_printf("Are we alone?:%d\n", own_nodes[i].ShortName.NodeID);
 					}
-					alone = 2000;
+					alone = 3000;
 #endif
 				} else if (alone)
 					alone -= time;
