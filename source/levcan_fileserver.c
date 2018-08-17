@@ -26,7 +26,7 @@ typedef struct {
 	uint16_t Operation;
 	uint16_t Size;
 	union {
-		int32_t Position;
+		uint32_t Position;
 		LC_FileAccess_t Mode;
 	};
 	uint8_t NodeID;
@@ -44,9 +44,9 @@ typedef struct {
 
 //extern functions
 extern LC_FileResult_t lcfopen(void** fileObject, char* name, LC_FileAccess_t mode);
-extern int32_t lcftell(void* fileObject);
-extern LC_FileResult_t lcflseek(void* fileObject, int32_t pointer);
-extern LC_FileResult_t lcfread(void* fileObject, char* buffer, int32_t bytesToRead, int32_t* bytesReaded);
+extern uint32_t lcftell(void* fileObject);
+extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
+extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
 extern LC_FileResult_t lcfclose(void* fileObject);
 //private functions
 fSrvObj* findFile(uint8_t source);
@@ -207,7 +207,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 			if (fileNode) {
 				fileNode->Timeout = 0;
 				//get current position
-				int32_t filepos = lcftell(fileNode->FileObject);
+				uint32_t filepos = lcftell(fileNode->FileObject);
 				LC_FileResult_t result = 0;
 				//try to move
 				if (fsinput->Position != filepos) {
@@ -219,7 +219,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 					sendAck(0, fsinput->NodeID, server, result);
 					continue;
 				}
-				int32_t btr = fsinput->Size;
+				uint32_t btr = fsinput->Size;
 				if (fsinput->Position != filepos)
 					btr = 0; //pointer not moved
 
