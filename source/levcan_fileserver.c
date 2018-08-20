@@ -48,7 +48,7 @@ extern uint32_t lcftell(void* fileObject);
 extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
 extern LC_FileResult_t lcfclose(void* fileObject);
-extern LC_FileResult_t lcfsize(void* fileObject);
+extern uint32_t lcfsize(void* fileObject);
 //private functions
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t node);
@@ -261,7 +261,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Denied;
-			int32_t filepos = 0;
+			uint32_t filepos = 0;
 			if (fileNode) {
 				rslt = lcflseek(fileNode->FileObject, fsinput->Position);
 				filepos = lcftell(fileNode->FileObject);
@@ -274,7 +274,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Denied;
-			int32_t filesize = 0;
+			uint32_t filesize = 0;
 			if (fileNode) {
 				filesize = lcfsize(fileNode->FileObject);
 			} else
