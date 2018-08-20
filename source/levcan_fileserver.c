@@ -48,6 +48,7 @@ extern uint32_t lcftell(void* fileObject);
 extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
 extern LC_FileResult_t lcfclose(void* fileObject);
+extern LC_FileResult_t lcfsize(void* fileObject);
 //private functions
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t node);
@@ -100,6 +101,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		gotfifo = 1;
 	}
 		break;
+	case fOpAckSize:
 	case fOpClose: {
 		fsinput->Position = 0;
 		fsinput->Size = 0;
@@ -118,7 +120,6 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 			gotfifo = 1;
 		}
 	}
-		break;
 	}
 	if (gotfifo) {
 		fsinput->Operation = *op;
@@ -157,7 +158,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				lcfree(fsinput->Data);
 				fsinput->Data = 0;
 				//already opened file
-				sendAck(0, fsinput->NodeID, server, LC_FR_TooManyOpenFiles);
+				sendAck(0, LC_FR_TooManyOpenFiles, server, fsinput->NodeID);
 			} else {
 				void* file;
 				LC_FileResult_t res = lcfopen(&file, fsinput->Data, fsinput->Mode);
@@ -170,7 +171,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 					fSrvObj* fileNode = lcmalloc(sizeof(fSrvObj));
 					if (fileNode == 0) {
 						//can't do anything, memory fail
-						sendAck(0, fsinput->NodeID, server, LC_FR_MemoryFull); //file error
+						sendAck(0, LC_FR_MemoryFull, server, fsinput->NodeID); //file error
 						lcfclose(file);
 						continue;
 					}
@@ -197,7 +198,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				}
 				if (file == 0 && res == 0)
 					res = LC_FR_MemoryFull;
-				sendAck(0, fsinput->NodeID, server, res);
+				sendAck(0, res, server, fsinput->NodeID);
 			}
 		}
 			break;
@@ -216,7 +217,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				}
 				if (result) {
 					//error happened
-					sendAck(0, fsinput->NodeID, server, result);
+					sendAck(0, result, server, fsinput->NodeID);
 					continue;
 				}
 				uint32_t btr = fsinput->Size;
@@ -225,7 +226,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 
 				fOpData_t* buffer = lcmalloc(sizeof(fOpData_t) + btr);
 				if (buffer == 0) {
-					sendAck(0, fsinput->NodeID, server, LC_FR_MemoryFull); //file error
+					sendAck(0, LC_FR_MemoryFull, server, fsinput->NodeID); //file error
 					continue;
 				}
 				buffer->Operation = fOpData;
@@ -241,7 +242,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				if (LC_SendMessage(server, &rec, LC_SYS_FileServer))
 					lcfree(buffer);
 			} else {
-				sendAck(0, fsinput->NodeID, server, LC_FR_Denied);
+				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
 			}
 		}
 			break;
@@ -251,7 +252,9 @@ void LC_FileServer(uint32_t tick, void* server) {
 			LC_FileResult_t rslt = LC_FR_Ok;
 			if (fileNode)
 				rslt = deleteFSObject(fileNode);
-			sendAck(0, fsinput->NodeID, server, rslt);
+			else
+				rslt = LC_FR_FileNotOpened;
+			sendAck(0, rslt, server, fsinput->NodeID);
 		}
 			break;
 		case fOpLseek: {
@@ -262,8 +265,21 @@ void LC_FileServer(uint32_t tick, void* server) {
 			if (fileNode) {
 				rslt = lcflseek(fileNode->FileObject, fsinput->Position);
 				filepos = lcftell(fileNode->FileObject);
-			}
-			sendAck(filepos, fsinput->NodeID, server, rslt);
+			} else
+				rslt = LC_FR_FileNotOpened;
+			sendAck(filepos, rslt, server, fsinput->NodeID);
+		}
+			break;
+		case fOpAckSize: {
+			fSrvObj* fileNode = findFile(fsinput->NodeID);
+			//do we have opened file for this node?
+			LC_FileResult_t rslt = LC_FR_Denied;
+			int32_t filesize = 0;
+			if (fileNode) {
+				filesize = lcfsize(fileNode->FileObject);
+			} else
+				rslt = LC_FR_FileNotOpened;
+			sendAck(filesize, rslt, server, fsinput->NodeID);
 		}
 			break;
 		}
@@ -325,7 +341,7 @@ LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t
 	rec.Size = sizeof(fOpAck_t);
 	rec.Attributes.Cleanup = 1;
 	if (LC_SendMessage(sender, &rec, LC_SYS_FileServer))
-		lcfree(ack);
+		lcfree(ack); //can't send, clean now
 	return LC_FR_Ok;
 }
 

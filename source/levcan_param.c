@@ -499,17 +499,19 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 	return; // nothing to do so here
 }
 
-/// Prints local parameters information
-/// @param vnode Node pointer
-void LC_ParamInfo_Size(void* vnode) {
+/// Returns and prints local parameters information
+LC_ParameterTableSize_t LC_ParamInfo_Size(void* vnode) {
 	LC_NodeDescription_t* node = vnode;
 	int32_t size = 0;
 	int32_t textsize = 0;
 	int32_t parameters = 0;
+	int32_t parameters_writable = 0;
 	for (int i = 0; i < node->DirectoriesSize; i++) {
 		size += ((LC_ParameterDirectory_t*) node->Directories)[i].Size * sizeof(LC_ParameterAdress_t);
 		for (int b = 0; b < ((LC_ParameterDirectory_t*) node->Directories)[i].Size; b++) {
 			parameters++;
+			if ((((LC_ParameterDirectory_t*) node->Directories)[i].Address[b].ParamType & PT_readonly) == 0)
+				parameters_writable++;
 			if (((LC_ParameterDirectory_t*) node->Directories)[i].Address[b].Name)
 				textsize += strlen(((LC_ParameterDirectory_t*) node->Directories)[i].Address[b].Name) + 1;
 			if (((LC_ParameterDirectory_t*) node->Directories)[i].Address[b].Formatting)
@@ -517,8 +519,14 @@ void LC_ParamInfo_Size(void* vnode) {
 		}
 	}
 #ifdef LEVCAN_TRACE
-	trace_printf("Parameters: %d, size bytes: %d, text: %d, total: %d\n", parameters, size, textsize, size + textsize);
+	trace_printf("Parameters: %d, writable: %d, size bytes: %d, text: %d, total: %d\n", parameters, parameters_writable, size, textsize, size + textsize);
 #endif
+	LC_ParameterTableSize_t ptsize;
+	ptsize.Size = size;
+	ptsize.ParametersWritable = parameters_writable;
+	ptsize.Parameters = parameters;
+	ptsize.Textsize = textsize;
+	return ptsize;
 }
 
 void LC_ParametersPrintAll(void* vnode) {

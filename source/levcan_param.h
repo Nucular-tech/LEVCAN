@@ -33,15 +33,15 @@ typedef enum {
 //WIP - work in progress
 typedef enum {
 	PT_value, 	//integer parameter, <name> and maybe <formatting> where '%s' defines position of converted <value>
-	PT_mask, 	//mask parameter, WIP
+	PT_mask, 	//mask parameter, (not implemented)
 	PT_bool, 	//ON/OFF parameter, <name> + ON / OFF default  (formatting not sent)
 	PT_enum,	//string enumerator, <name> + <formatting> ("1\n2\n3\n"), where <value> = line index, or if out of index, write <value>
-	PT_string,	//string optional <name> + editable (or not if RO) <formatting>
-	PT_bitfield, //bit field,  <name> + <formatting> ("Flag1\nFlag2\nFlag3\n"), value is bitfield, where new line is a one bit.
-	PT_func,	//function entry, WIP
-	PT_remap,	//entry remapped to address
-	PT_dir,		//directory entry, <name> only
-	PT_readonly = 0x20,	//read only bit, applicable to value, mask, bool, enum, string
+	PT_string,	//string optional <name> + editable (or not if RO) <formatting> (not implemented)
+	PT_bitfield, //bit field,  <name> + <formatting> ("Flag1\nFlag2\nFlag3\n"), value is bitfield, where new line is a one bit. (not implemented)
+	PT_func,	//function entry (not implemented)
+	PT_remap,	//entry remapped to address (not implemented)
+	PT_dir,		//directory entry, <name> only, readonly directory means runtime variables and will not be exported
+	PT_readonly = 0x20,	//read only bit, applicable to value, mask, bool, enum, string, directory
 	PT_reqval = 0x40,	//value requested
 	PT_noinit = 0x80,	//parameter to be received
 	PT_invalid = 0xFF,	//ending
@@ -99,9 +99,16 @@ typedef struct {
 	uint16_t Size;
 } LC_VariableDirectory_t;
 
+typedef struct {
+	int32_t Size;
+	int32_t Textsize;
+	int32_t Parameters;
+	int32_t ParametersWritable;
+} LC_ParameterTableSize_t;
+
 #define DIRDEF(NAME)		{NAME,(sizeof(NAME)/sizeof(NAME[0]))}
 
-void LC_ParamInfo_Size(void* vnode);
+LC_ParameterTableSize_t LC_ParamInfo_Size(void* vnode);
 void LC_ParametersPrintAll(void* vnode);
 LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) ;
 LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full);

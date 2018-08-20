@@ -8,7 +8,7 @@
 #pragma once
 
 enum {
-	fOpNoOp, fOpOpen, fOpRead, fOpWrite, fOpClose, fOpAck, fOpLseek, fOpData, fOpOpenDir, fOpReadDir
+	fOpNoOp, fOpOpen, fOpRead, fOpWrite, fOpClose, fOpAck, fOpLseek, fOpData, fOpAckSize, fOpOpenDir, fOpReadDir,
 };
 
 typedef struct {
@@ -25,12 +25,22 @@ typedef struct {
 
 typedef struct {
 	uint16_t Operation;
+	uint16_t ToBeWrite;
+	uint32_t Position;
+} fOpWrite_t;
+
+typedef struct {
+	uint16_t Operation;
 	uint32_t Position;
 } fOpLseek_t;
 
 typedef struct {
 	uint16_t Operation;
 } fOpClose_t;
+
+typedef struct {
+	uint16_t Operation;
+} fOpAckSize_t;
 
 typedef struct {
 	uint16_t Operation;
