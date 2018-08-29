@@ -273,7 +273,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 		case fOpAckSize: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
-			LC_FileResult_t rslt = LC_FR_Denied;
+			LC_FileResult_t rslt = LC_FR_Ok;
 			uint32_t filesize = 0;
 			if (fileNode) {
 				filesize = lcfsize(fileNode->FileObject);

@@ -54,11 +54,12 @@ typedef struct {
 	uint16_t Errors;
 } LC_FileAck_t;
 
-LC_NodeShortName_t LC_FindFileServer(uint16_t* scnt);
 LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node, uint8_t server_node);
 LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node);
 LC_FileResult_t LC_FileClose(void* sender_node, uint8_t server_node);
 LC_FileResult_t LC_FileLseek(void* sender_node);
 uint32_t LC_FileTell(void* sender_node);
+uint32_t LC_FileSize(void* sender_node);
 
+LC_NodeShortName_t LC_FindFileServer(uint16_t* scnt);
 LC_NodeShortName_t LC_FileGetServer(void* sender_node);
