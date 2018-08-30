@@ -20,7 +20,7 @@ typedef enum {
 #define _Generic(...) 0
 #endif
 //macro for auto-type specifier
-#define pti(param, min, max, step, decimal) &(param), min, max, step, decimal, _Generic((param),		\
+#define pti(param, min, max, step, decimal) (void*)&(param), min, max, step, decimal, _Generic((param),		\
         uint8_t: 	VT_uint8,	\
 		int8_t: 	VT_int8,	\
 		uint16_t: 	VT_uint16,	\
@@ -28,6 +28,7 @@ typedef enum {
 		uint32_t: 	VT_int32,	\
 		int32_t: 	VT_int32,	\
 		float: 		VT_float,	\
+		LC_ParameterAdress_t: 0,\
 		default: 	VT_unknown)
 
 //WIP - work in progress
@@ -55,8 +56,8 @@ typedef struct {
 	uint8_t Decimal;
 	LC_ValueType_t ValueType; //addressed parameter size and type
 	LC_ParamType_t ParamType; //this entry mode/type
-	char* Name;
-	char* Formatting;
+	const char* Name;
+	const char* Formatting;
 } LC_ParameterAdress_t;
 
 typedef struct {
