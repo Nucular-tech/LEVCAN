@@ -42,6 +42,7 @@ typedef enum {
 	PT_func,	//function entry (not implemented)
 	PT_remap,	//entry remapped to address (not implemented)
 	PT_dir,		//directory entry, <name> only, readonly directory means runtime variables and will not be exported
+	PT_typeMask = 0x1F, //used to filter bitfields
 	PT_readonly = 0x20,	//read only bit, applicable to value, mask, bool, enum, string, directory
 	PT_reqval = 0x40,	//value requested
 	PT_noinit = 0x80,	//parameter to be received
@@ -68,7 +69,7 @@ typedef struct {
 	};
 	union {
 		int32_t Max;
-		int32_t EntryIndex;
+		int32_t DirectorySize;
 	};
 	int32_t Step;
 	uint8_t Index;
@@ -110,7 +111,14 @@ typedef struct {
 #define DIRDEF(NAME)		{NAME,(sizeof(NAME)/sizeof(NAME[0]))}
 
 LC_ParameterTableSize_t LC_ParamInfo_Size(void* vnode);
-void LC_ParametersPrintAll(void* vnode);
-LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) ;
+LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node);
 LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full);
 void LC_ParametersStopUpdating(void);
+int32_t LC_GetParameterValue(const LC_ParameterAdress_t* parameter);
+int LC_SetParameterValue(const LC_ParameterAdress_t* parameter, int32_t value);
+const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t* node, int16_t dir, int16_t index);
+//misc functions
+void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter);
+int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const char* string, int32_t* value);
+int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s);
+int16_t LC_IsParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory);

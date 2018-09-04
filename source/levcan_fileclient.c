@@ -246,7 +246,7 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btr, uint32_t* br, voi
 		if (toreadnow > INT16_MAX)
 			toreadnow = INT16_MAX;
 		//Prepare receiver
-		rxtoread[id].Buffer = &buffer[position];
+		rxtoread[id].Buffer = (char*) &buffer[position];
 		rxtoread[id].Error = 0;
 		rxtoread[id].Position = -1;
 		rxtoread[id].ReadBytes = toreadnow;
