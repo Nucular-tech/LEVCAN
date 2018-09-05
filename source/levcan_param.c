@@ -138,7 +138,7 @@ int32_t LC_GetParameterValue(const LC_ParameterAdress_t* parameter) {
 }
 
 int LC_SetParameterValue(const LC_ParameterAdress_t* parameter, int32_t value) {
-	if (value > parameter->Max || value < parameter->Min)
+	if (value > parameter->Max || value < parameter->Min || (parameter->ParamType & PT_readonly) || parameter->Address == 0)
 		return 1;
 	if (((uint32_t) parameter->Address > UINT8_MAX) && (check_align(parameter) == 0))
 		switch (parameter->ValueType) {
@@ -582,47 +582,72 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 /// @param value output
 /// @return 0 if ok, 1 if error
 int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const char* s, int32_t* value) {
-	if (parameter->ParamType == PT_enum || parameter->ParamType == PT_bool) {
-		s = skipspaces(s);
+	int32_t integer = 0;
+	int type = parameter->ParamType & PT_typeMask;
+	s = skipspaces(s);
+	int length = strcspn(s, "#\n\r");
+	if (type == PT_enum || type == PT_bool) {
 		const char* haystack = parameter->Formatting;
 		if (parameter->ParamType == PT_bool)
 			haystack = "OFF\nON";
 		//end is comment or newline
-		int length = strcspn(s, "#\n\r");
-		//match found!
-		int16_t val = 0;
-		int i;
-		for (i = 0; i < length;) {
-			//increase value index in enum each founded newline
-		//	if (*finded == '\n')
-			//	i++;
+		int haylen = strlen(haystack);
+		//remove space ending
+		for (; length > 0 && isblank(s[length - 1]); length--)
+			;
+		int found = 0;
+		//look in haystack
+		int h = 0;
+		while (h < haylen && length > 0) {
+			//compare new line
+			if (strncmp(&haystack[h], s, length) == 0) {
+				found = 1;
+				break;
+			}
+			//count till new line
+			for (; h < haylen; h++) {
+				//compare needle
+				if (haystack[h] == '\n') {
+					integer++;
+					h++;
+					break;
+				}
+			}
 		}
-		if (i > parameter->Max || i < parameter->Min)
+		if (found) {
+			*value = integer;
+			return 0;
+		}
+	}
+	if (type != PT_string && type != PT_func && type != PT_dir) {
+		//other types failed? try integer type, anywhere supported
+		integer = strtol(s, 0, 0);
+		if (integer == INT32_MAX)
 			return 1;
-		*value = i;
+		char *decStr = memchr(s, '.', length);
+		if (decStr != NULL) {
+#ifdef LEVCAN_USE_FLOAT
+			float temp = atoff(s);
+			integer = temp * pow10i(parameter->Decimal);
+#endif
+		} else
+			integer *= pow10i(parameter->Decimal);
+		*value = integer;
 		return 0;
 
 	}
-	//other types failed? try integer type, anywhere supported
-	int32_t integer = 0;
-	integer = strtol(s, 0, 0) * pow10i(parameter->Decimal);
-	char *decStr = strchr(s, '.');
-	if (decStr != NULL) {
-#ifdef LEVCAN_USE_FLOAT
-		float temp = atoff(s);
-		integer = temp * pow10i(parameter->Decimal);
-#endif
-	}
-	*value = integer;
-	if (integer != INT32_MAX && integer < parameter->Max && integer > parameter->Min)
-		return 0;
 	return 1;
 }
 
 int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
+	//index [0] is directory entry, dont scan
+	int searchlen = strcspn(s, "]#=\n\r");
+	//remove space ending
+	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
+		;
 	for (uint16_t i = 0; i < node->DirectoriesSize; i++) {
 		const LC_ParameterAdress_t* directory = &((LC_ParameterDirectory_t*) node->Directories)[i].Address[0];
-		if (directory->Name && strncmp(directory->Name, s, strlen(directory->Name)) == 0) {
+		if (directory->Name && strncmp(directory->Name, s, searchlen) == 0) {
 			return i;
 		}
 	}
@@ -630,12 +655,16 @@ int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
 }
 
 int16_t LC_IsParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
-//index [0] is directory entry, dont scan
+	//index [0] is directory entry, dont scan
+	int searchlen = strcspn(s, "#=\n\r");
+	//remove space ending
+	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
+		;
 	for (uint16_t i = 1; i < ((LC_ParameterDirectory_t*) node->Directories)[directory].Size; i++) {
 		//todo carefully check types
 		const LC_ParameterAdress_t* param = &((LC_ParameterDirectory_t*) node->Directories)[directory].Address[i];
 		//other directories entry don't have name in the pointer, so they will be skipped
-		if (param->Name && (strncmp(param->Name, s, strlen(param->Name)) == 0)) {
+		if (param->Name && (strncmp(param->Name, s, searchlen) == 0)) {
 			return i;
 		}
 	}
@@ -672,7 +701,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 	if (index == 0 || directory == 0 || value == 0 || input == 0 || node == 0)
 		return 0;
 	int16_t dir = *directory;
-	int16_t indx = *index;
+	int16_t indx = -1;
 
 	//skip first spaces
 	const char* line = skipspaces(input);
@@ -686,7 +715,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 			dir = LC_IsDirectory(node, line);
 			//too short or large, or new line? wrong
 			if (dir >= 0) {
-				indx = 0;
+				indx = -1;
 				//trace_printf("Parsed dir: \"%s\"\n", sbuffer);
 			} else {
 				//trace_printf("Directory not found: \"%s\"\n", sbuffer);
@@ -696,13 +725,13 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 			//parameter = value
 			//Vasya = Pupkin #comment
 			int endofname = strcspn(line, "#=\n\r");
-			int id = LC_IsParameter(node, line, dir);
+			indx = LC_IsParameter(node, line, dir);
 			//too short or large, or new line? wrong
-			if (id > 0 && line[endofname] == '=') {
+			if (indx > 0 && line[endofname] == '=') {
 				//endofname is '=' here
 				line += endofname + 1;
-				const LC_ParameterAdress_t* addr = &((LC_ParameterDirectory_t*) node->Directories)[dir].Address[id];
-				if (LC_GetParameterValueFromStr(addr, line, value)) {
+				const LC_ParameterAdress_t* addr = LC_GetParameterAdress(node, dir, indx);
+				if (addr && LC_GetParameterValueFromStr(addr, line, value)) {
 					indx = -1;
 				}
 			}

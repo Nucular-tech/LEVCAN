@@ -118,6 +118,7 @@ int32_t LC_GetParameterValue(const LC_ParameterAdress_t* parameter);
 int LC_SetParameterValue(const LC_ParameterAdress_t* parameter, int32_t value);
 const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t* node, int16_t dir, int16_t index);
 //misc functions
+const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input, int16_t* directory, int16_t* index, int32_t* value);
 void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter);
 int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const char* string, int32_t* value);
 int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s);
