@@ -150,7 +150,7 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 		//Prepare receiver
 		rxtoread[id].Buffer = &buffer[position];
 		rxtoread[id].Error = 0;
-		rxtoread[id].Position = -1;
+		rxtoread[id].Position = UINT32_MAX;
 		rxtoread[id].ReadBytes = toreadnow;
 		readf.ToBeRead = toreadnow;
 		readf.Position = globalpos; //add global position
@@ -302,12 +302,13 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btr, uint32_t* br, voi
 /// @param sender_node Own network node
 /// @param server_node Server id, can be LC_Broadcast_Address to find first one
 /// @return LC_FileResult_t
-LC_FileResult_t LC_FileLseek(void* sender_node) {
+LC_FileResult_t LC_FileLseek(uint32_t position, void* sender_node) {
 	int16_t reid;
 	//create buffer
-	fOpLseek_t closef;
-	closef.Operation = fOpLseek;
-	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpClose_t), sender_node, &reid);
+	fOpLseek_t lseekf;
+	lseekf.Operation = fOpLseek;
+	lseekf.Position = position;
+	LC_FileResult_t result = lc_client_sendwait(&lseekf, sizeof(fOpLseek_t), sender_node, &reid);
 	if (reid >= 0 && rxack[reid].Operation == fOpAck)
 		fpos[reid] = rxack[reid].Position; //update position
 	return result;

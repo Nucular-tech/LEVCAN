@@ -212,7 +212,7 @@ void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, in
 			value = LC_GetParameterValue(parameter);
 			param_to_send->Value = value;
 			param_to_send->Min = parameter->Min;
-			if ((parameter->ParamType & PT_typeMask) == PT_dir)
+			if (pdindex == 0)
 				param_to_send->Max = directory->Size; //directory size
 			else
 				param_to_send->Max = parameter->Max;

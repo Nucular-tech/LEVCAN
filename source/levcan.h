@@ -80,7 +80,7 @@ typedef struct {
 		unsigned Configurable :1; //can be configured using levcan_param
 		unsigned Variables :1; //there are some variables can be read
 		unsigned SWUpdates :1; //device may be updated
-		unsigned Events :1; //can send events to network
+		unsigned Events :1; //can receive events
 		unsigned FileServer :1; //can proceed file io operations from other nodes
 	}LEVCAN_PACKED;
 	int16_t NodeID; //-1 will autodetect, 0-63 preffered address, 64-125 all
