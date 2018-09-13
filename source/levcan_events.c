@@ -17,8 +17,7 @@
 typedef struct {
 	uint16_t TextSize;
 	uint8_t CaptionSize;
-	uint8_t Buttons;
-	uint8_t Icon;
+	uint8_t Buttons_Icons;
 	char Text[];
 } eventSend_t;
 
@@ -51,7 +50,7 @@ LC_EventResult_t LC_EventSend(const char* text, const char* caption, LC_EventBut
 		return LC_ER_None;
 
 	eventSend_t* evnt = (eventSend_t*) lc_event_buffer;
-	evnt->Buttons = buttons;
+	evnt->Buttons_Icons = buttons;
 	evnt->CaptionSize = caps; //including zero
 	evnt->TextSize = texts;
 	memcpy(evnt->Text, text, texts);
@@ -133,7 +132,7 @@ int LC_EventReceive(const void* data, int32_t dsize, uint8_t sender, LC_Event_t*
 	} else
 	event->Caption = 0;
 
-	event->Buttons = evt->Buttons;
+	event->Buttons_Icons = evt->Buttons_Icons;
 	event->Sender = sender;
 	return ret;
 }
