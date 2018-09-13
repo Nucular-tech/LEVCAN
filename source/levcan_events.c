@@ -113,26 +113,26 @@ int LC_EventReceive(const void* data, int32_t dsize, uint8_t sender, LC_Event_t*
 	int ret = 0;
 	//check valid
 	if (event == 0 || data == 0 || (int32_t) (evt->TextSize + evt->CaptionSize + sizeof(eventSend_t)) != dsize)
-	return 1;
+		return 1;
 	event->Text = (char*) lcmalloc(evt->TextSize);
 	if (event->Text)
-	memcpy(event->Text, evt->Text, evt->TextSize);
+		memcpy(event->Text, evt->Text, evt->TextSize);
 	else
-	ret = 1;
+		ret = 1;
 
 	if (evt->CaptionSize > 0) {
 		event->Caption = (char*) lcmalloc(evt->CaptionSize);
 		if (event->Caption)
-		memcpy(event->Caption, &evt->Text[evt->TextSize], evt->CaptionSize);
+			memcpy(event->Caption, &evt->Text[evt->TextSize], evt->CaptionSize);
 		else {
 			if (event->Text)
-			lcfree(event->Text);
+				lcfree(event->Text);
 			ret = 1;
 		}
 	} else
-	event->Caption = 0;
-
-	event->Buttons_Icons = evt->Buttons_Icons;
+		event->Caption = 0;
+	event->Buttons = evt->Buttons_Icons & 0xF;
+	event->Icon = evt->Buttons_Icons & 0xF0;
 	event->Sender = sender;
 	return ret;
 }
