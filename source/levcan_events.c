@@ -18,6 +18,7 @@ typedef struct {
 	uint16_t TextSize;
 	uint8_t CaptionSize;
 	uint8_t Buttons;
+	uint8_t Icon;
 	char Text[];
 } eventSend_t;
 
