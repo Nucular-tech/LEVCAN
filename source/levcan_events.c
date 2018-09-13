@@ -88,7 +88,6 @@ void LC_EventReset(uint8_t receiver) {
 LC_NodeShortName_t LC_FindEventServer(uint16_t* scnt) {
 	uint16_t counter = 0;
 	LC_NodeShortName_t node;
-	node.NodeID = LC_Broadcast_Address;
 	if (scnt)
 		counter = *scnt;
 	while (node.NodeID != LC_Broadcast_Address) {
