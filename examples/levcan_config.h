@@ -16,6 +16,11 @@ static inline void lc_disable_irq(void)
 {
 	asm volatile ("cpsid i" : : : "memory");
 }
+//FEATURES
+#define LEVCAN_FILECLIENT
+//#define LEVCAN_FILESERVER
+#define LEVCAN_PARAMETERS
+#define LEVCAN_EVENTS
 
 //Print debug messages using trace_printf
 //#define LEVCAN_TRACE

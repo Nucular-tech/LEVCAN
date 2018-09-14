@@ -58,7 +58,7 @@ typedef struct {
 #ifdef LEVCAN_STATIC_MEM
 		char Data[LEVCAN_OBJECT_DATASIZE];
 #else
-		char Data[sizeof(char*)];
+	char Data[sizeof(char*)];
 #endif
 	};
 	int32_t Length;
@@ -129,6 +129,9 @@ objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint
 
 void lc_default_handler(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 //#### EXTERNAL MODULES #### todo: other compiler support
+#ifdef LEVCAN_EVENTS
+extern volatile uint8_t lc_eventButtonPressed;
+#endif
 #ifdef LEVCAN_PARAMETERS
 extern void __attribute__((weak, alias("lc_default_handler")))
 proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
@@ -162,7 +165,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	if (node.VendorName != 0 && strnlen(node.VendorName, 128) == 128)
 		node.VendorName = 0;
 
-	//save node in table
+//save node in table
 	LC_NodeDescription_t* newnode = 0;
 	int i = 0;
 	for (; i < LEVCAN_MAX_OWN_NODES; i++) {
@@ -194,13 +197,13 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	newnode->Directories = node.Directories;
 	newnode->DirectoriesSize = node.DirectoriesSize;
 
-	//clean up
+//clean up
 	memset(newnode->SystemObjects, 0, sizeof(newnode->SystemObjects));
-	//now setup system calls
+//now setup system calls
 	uint16_t sysinx = 0;
 	LC_Object_t* objparam;
-	//adress claim, main network function
-	//newnode->SystemObjects[sysinx++] = prclaim;
+//adress claim, main network function
+//newnode->SystemObjects[sysinx++] = prclaim;
 	objparam = &newnode->SystemObjects[sysinx++];
 	objparam->Address = proceedAddressClaim;
 	objparam->Attributes.Readable = 1;
@@ -230,13 +233,21 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 		objparam->Index = LC_SYS_VendorName;
 		objparam->Size = strlen(newnode->VendorName) + 1;
 	}
-	//SN
+//SN
 	objparam = &newnode->SystemObjects[sysinx++];
 	objparam->Address = &newnode->Serial;
 	objparam->Attributes.Readable = 1;
 	objparam->Index = LC_SYS_SerialNumber;
 	objparam->Size = sizeof(newnode->Serial);
-	//todo add server also?!
+#ifdef LEVCAN_EVENTS
+//Event response
+	objparam = &newnode->SystemObjects[sysinx++];
+	objparam->Address = (void*) &lc_eventButtonPressed;
+	objparam->Attributes.Writable = 1;
+	objparam->Index = LC_SYS_Events;
+	objparam->Size = sizeof(lc_eventButtonPressed);
+#endif
+//todo add server also?!
 #ifdef LEVCAN_PARAMETERS
 	if (newnode->ShortName.Configurable && proceedParam != lc_default_handler) {
 		//parameter editor
@@ -273,7 +284,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 		objparam->Size = -1;      //anysize
 	}
 #endif
-	//begin network discovery for start
+//begin network discovery for start
 	newnode->LastTXtime = 0;
 	LC_SendDiscoveryRequest(LC_Broadcast_Address);
 	newnode->State = LCNodeState_NetworkDiscovery;
@@ -469,23 +480,23 @@ void configureFilters(void) {
 
 	CAN_FiltersClear();
 	CAN_FilterEditOn();
-	//global filter
+//global filter
 	headerPacked_t reg = { 0 }, mask = { 0 };
 	reg.MsgID = LC_SYS_AddressClaimed;
-	//reg.RTS_CTS = 0;    //no matter
-	//reg.Parity = 0;    // no matter
-	//reg.Priority = 0;    //no matter
-	//reg.Source = 0;    //any source
+//reg.RTS_CTS = 0;    //no matter
+//reg.Parity = 0;    // no matter
+//reg.Priority = 0;    //no matter
+//reg.Source = 0;    //any source
 	reg.Target = LC_Broadcast_Address;    //we are target- Broadcast, this should match
-	//reg.Request = 0;
-	//fill can mask match
+//reg.Request = 0;
+//fill can mask match
 	mask = reg;
 	if (own_nodes[0].ShortName.NodeID < LC_Null_Address) {
 		mask.MsgID = 0;    //match any brdcast
 	} else
 		mask.MsgID = 0x3F0;    //match for first 16 system messages
-	//mask.Request = 0;    //any request or data
-	//type cast
+//mask.Request = 0;    //any request or data
+//type cast
 	CAN_CreateFilterMask((CAN_IR ) { .ToUint32 = reg.ToUint32 }, (CAN_IR ) { .ToUint32 = mask.ToUint32 }, 0);
 
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
@@ -496,21 +507,21 @@ void configureFilters(void) {
 }
 
 void addAddressFilter(uint16_t address) {
-	//global filter
+//global filter
 	headerPacked_t reg = { 0 }, mask = { 0 };
-	//reg.MsgID = 0;    //no matter
-	//reg.RTS_CTS = 0;    //no matter
-	//reg.Parity = 0;    // no matter
-	//reg.Priority = 0;    //no matter
-	//reg.Source = 0;    //any source
+//reg.MsgID = 0;    //no matter
+//reg.RTS_CTS = 0;    //no matter
+//reg.Parity = 0;    // no matter
+//reg.Priority = 0;    //no matter
+//reg.Source = 0;    //any source
 	reg.Target = address;    //we are target, this should match
-	//reg.Request = 0;    //no matter
-	//fill can mask match
-	//mask = reg;
-	//mask.MsgID = 0;    //match any
+//reg.Request = 0;    //no matter
+//fill can mask match
+//mask = reg;
+//mask.MsgID = 0;    //match any
 	mask.Target = LC_Broadcast_Address;    // should match
-	//mask.Request = 0;    //any request or data
-	//type cast
+//mask.Request = 0;    //any request or data
+//type cast
 	CAN_CreateFilterMask((CAN_IR ) { .ToUint32 = reg.ToUint32 }, (CAN_IR ) { .ToUint32 = mask.ToUint32 }, 0);
 }
 
@@ -543,7 +554,7 @@ void LC_ReceiveHandler(void) {
 	static headerPacked_t header;
 	static uint32_t data[2];
 	static uint16_t length;
-	//fast receive to clear input buffer, handle later in manager
+//fast receive to clear input buffer, handle later in manager
 	while (CAN_Receive(&header.ToUint32, data, &length) == CANH_Ok) {
 		//buffer not full?
 		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
@@ -732,7 +743,7 @@ void LC_NetworkManager(uint32_t time) {
 		//get next buffer index
 		rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 	}
-	//count work time and clean up
+//count work time and clean up
 	objBuffered* txProceed = (objBuffered*) objTXbuf_start;
 	while (txProceed) {
 		objBuffered* next = (objBuffered*) txProceed->Next;
@@ -763,7 +774,7 @@ void LC_NetworkManager(uint32_t time) {
 		}
 		txProceed = next;
 	}
-	//count work time and recall
+//count work time and recall
 	objBuffered* rxProceed = (objBuffered*) objRXbuf_start;
 	while (rxProceed) {
 		objBuffered* next = (objBuffered*) rxProceed->Next;
@@ -782,7 +793,7 @@ void LC_NetworkManager(uint32_t time) {
 	LC_TransmitHandler();    //start tx
 
 #if (LEVCAN_MAX_TABLE_NODES) > 0
-	//now look for dead nodes...
+//now look for dead nodes...
 	static uint32_t offline_tick = 0;
 	const uint16_t off_period = 250;    //0.25s
 	offline_tick += time;
@@ -835,7 +846,7 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 			(*end)->Next = 0;
 	}
 	lc_enable_irq();
-	//free this object
+//free this object
 #ifdef LEVCAN_MEM_STATIC
 	releaseObject(obj);
 #else
@@ -845,7 +856,7 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 #ifdef LEVCAN_MEM_STATIC
 objBuffered* getFreeObject(void) {
 	objBuffered* ret = 0;
-	//last free index
+//last free index
 	lc_disable_irq();
 	int freeid = objectBuffer_freeID;
 	if (freeid >= 0 && freeid < LEVCAN_OBJECT_SIZE) {
@@ -875,9 +886,8 @@ void releaseObject(objBuffered* obj) {
 		objectBuffer[index].Previous = 0;
 		//save first free buffer in fast index
 		if (index < objectBuffer_freeID)
-		objectBuffer_freeID = index;
-	}
-	else {
+			objectBuffer_freeID = index;
+	} else {
 #ifdef LEVCAN_TRACE
 		trace_printf("Delete object error\n");
 #endif
@@ -918,7 +928,7 @@ void claimFreeID(LC_NodeDescription_t* node) {
 	}
 	if (freeid > LC_NodeFreeIDmax)
 		freeid = LC_NodeFreeIDmin;
-	//todo fix endless loop
+//todo fix endless loop
 	while (searchIndexCollision(freeid, node)) {
 		freeid++;
 		if (freeid > LC_NodeFreeIDmax)
@@ -932,7 +942,7 @@ void claimFreeID(LC_NodeDescription_t* node) {
 	LC_AddressClaimHandler(node->ShortName, LC_TX);
 	node->LastTXtime = 0;
 	node->State = LCNodeState_WaitingClaim;
-	//add new own address filter TODO add later after verification
+//add new own address filter TODO add later after verification
 	CAN_FilterEditOn();
 	addAddressFilter(freeid);
 	CAN_FilterEditOff();
@@ -976,7 +986,7 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 
 	txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
 	lc_enable_irq();
-	//proceed queue if we can do;
+//proceed queue if we can do;
 	if (empty)
 		LC_TransmitHandler();
 	return LC_Ok;
@@ -997,7 +1007,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 #ifndef LEVCAN_MEM_STATIC
 			//cleanup tx buffer also
 			if (object->Flags.TXcleanup)
-				lcfree(object->Pointer);
+			lcfree(object->Pointer);
 #endif
 			//delete object from memory chain, find new endings
 			deleteObject(object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
@@ -1063,7 +1073,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 		object->Time_since_comm = 0;    //data sent
 //cycle if this is UDP till message end or buffer half fill
 	} while ((object->Flags.TCP == 0) && (getTXqueueSize() * 3 < LEVCAN_TX_SIZE * 4) && (object->Header.EoM == 0));
-	//in UDP mode delete object when EoM is set
+//in UDP mode delete object when EoM is set
 	if ((object->Flags.TCP == 0) && (object->Header.EoM == 1)) {
 		if (object->Flags.TXcleanup) {
 			lcfree(object->Pointer);
@@ -1080,7 +1090,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 	uint8_t parity = ~((object->Position + 7) / 8) & 1;    //parity
 	int32_t position_new = object->Position;
 
-	//increment data if correct parity or if mode=0 (UDP)
+//increment data if correct parity or if mode=0 (UDP)
 	if (msg && ((msg->header.Parity == parity) || (object->Flags.TCP == 0))) {
 		//new correct data
 		position_new += msg->length;
@@ -1106,7 +1116,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 		}
 #ifndef LEVCAN_MEM_STATIC
 		if (object->Pointer)
-			memcpy(&object->Pointer[object->Position], msg->data, msg->length);
+		memcpy(&object->Pointer[object->Position], msg->data, msg->length);
 #else
 		memcpy(&object->Data[object->Position], msg->data, msg->length);
 #endif
@@ -1120,7 +1130,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 	 trace_printf("RX parity error:%d position:%d\n", object->Header.MsgID, object->Position);
 	 else if (msg == 0)
 	 trace_printf("Timeout ");*/
-	//pack new header responce
+//pack new header responce
 	if (object->Flags.TCP) {
 		headerPacked_t hdr = { 0 };
 		if (object->Header.EoM) {
@@ -1160,7 +1170,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint8_t memfree) {
 	LC_Return_t ret = LC_Ok;
 	LC_NodeDescription_t* node = findNode(header.Target);
-	//check check and check again
+//check check and check again
 	LC_ObjectRecord_t obj = findObjectRecord(header.MsgID, size, node, Write, header.Source);
 	if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
 		if (obj.Attributes.Function) {
@@ -1174,7 +1184,7 @@ LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint
 			*(char**) obj.Address = data;
 			//cleanup if there was pointer
 			if (clean)
-				lcfree(clean);
+			lcfree(clean);
 			memfree = 0;
 #endif
 		} else {
