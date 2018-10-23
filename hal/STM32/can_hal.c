@@ -1,4 +1,3 @@
-#include "can_hal.h"
 #include <string.h>
 #include <math.h>
 
@@ -11,10 +10,12 @@
 #ifdef  STM32F30X
 #include "stm32f30x.h"
 #endif
+#include "can_hal.h"
 
 const float accuracy = 1.e-3;	// minimum required accuracy of the bit time
 uint8_t _getFreeTX();
 extern void LC_ReceiveHandler(void);
+extern void LC_TransmitHandler(void);
 #ifdef TRACE
 extern int trace_printf(const char* format, ...);
 #endif
