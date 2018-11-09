@@ -1433,9 +1433,9 @@ void LC_TransmitHandler(void) {
 	mutex=1;
 	while (1) {
 		if (txFIFO_in == txFIFO_out)
-			return; /* Queue Empty - nothing to send*/
+			break; /* Queue Empty - nothing to send*/
 		if (CAN_Send(txFIFO[txFIFO_out].header.ToUint32, txFIFO[txFIFO_out].data, txFIFO[txFIFO_out].length) != 0)
-			return; //CAN full
+			break; //CAN full
 		txFIFO_out = (txFIFO_out + 1) % LEVCAN_TX_SIZE;
 	}
 	mutex=0;
