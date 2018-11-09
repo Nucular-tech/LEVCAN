@@ -28,8 +28,14 @@ static inline void lc_disable_irq(void)
 //#define trace_printf printf
 //Float-point support
 //#define LEVCAN_USE_FLOAT
-//Memory packing, compiler specific
-#define LEVCAN_PACKED __attribute__((packed))
+//Memory packing, compiler specific, used to decrease the data type alignment to 1-byte
+#if defined (__CC_ARM)         /* ARM Compiler */
+  #define LEVCAN_PACKED    __packed
+#elif defined (__ICCARM__)     /* IAR Compiler */
+  #define LEVCAN_PACKED    __packed
+#elif defined   ( __GNUC__ )   /* GNU Compiler */                        
+  #define LEVCAN_PACKED    __attribute__((__packed__))
+#endif /* __CC_ARM */
 //Max device created nodes
 #define LEVCAN_MAX_OWN_NODES 2
 //Network node table

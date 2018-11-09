@@ -364,8 +364,11 @@ CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length) {
 	if (data) {
 		data[0] = CAN1->sFIFOMailBox[fifo].RDLR;
 		data[1] = CAN1->sFIFOMailBox[fifo].RDHR;
-	}
-	CAN1->RF0R = CAN_RF0R_RFOM0;
+	}	
+	if (fifo == 0)
+		CAN1->RF0R = CAN_RF0R_RFOM0;
+	else
+		CAN1->RF1R = CAN_RF1R_RFOM1;
 	return status;
 }
 

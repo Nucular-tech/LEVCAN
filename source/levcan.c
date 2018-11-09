@@ -554,7 +554,7 @@ void LC_ReceiveHandler(void) {
 	static headerPacked_t header;
 	static uint32_t data[2];
 	static uint16_t length;
-//fast receive to clear input buffer, handle later in manager
+	//fast receive to clear input buffer, handle later in manager
 	while (CAN_Receive(&header.ToUint32, data, &length) == CANH_Ok) {
 		//buffer not full?
 		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
@@ -754,7 +754,7 @@ void LC_NetworkManager(uint32_t time) {
 		} else {
 			//TCP mode
 			if (txProceed->Time_since_comm > 100) {
-				if (txProceed->Attempt > 10) {
+				if (txProceed->Attempt >= 3) {
 					//TX timeout, make it free!
 #ifdef LEVCAN_TRACE
 					trace_printf("TX object deleted by attempt:%d\n", txProceed->Header.MsgID);
@@ -779,7 +779,7 @@ void LC_NetworkManager(uint32_t time) {
 	while (rxProceed) {
 		objBuffered* next = (objBuffered*) rxProceed->Next;
 		rxProceed->Time_since_comm += time;
-		if (rxProceed->Time_since_comm > 1000) {
+		if (rxProceed->Time_since_comm > 500) {
 			//UDP mode rx timeout
 #ifdef LEVCAN_TRACE
 			trace_printf("RX object deleted by timeout:%d\n", rxProceed->Header.MsgID);
@@ -969,9 +969,9 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 		return LC_BufferFull;
 	}
 
-	int empty = 0;
-	if (txFIFO_in == txFIFO_out)
-		empty = 1;
+//	int empty = 0;
+//	if (txFIFO_in == txFIFO_out)
+//		empty = 1;
 
 	txFIFO[txFIFO_in].header = hdr;
 	txFIFO[txFIFO_in].header.IDE = 1;    //use EXID
@@ -986,9 +986,9 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 
 	txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
 	lc_enable_irq();
-//proceed queue if we can do;
-	if (empty)
-		LC_TransmitHandler();
+	//proceed queue if we can do, NOT THREAD SAFE
+//	if (empty)
+//		LC_TransmitHandler();
 	return LC_Ok;
 }
 
@@ -1426,6 +1426,11 @@ LC_Return_t LC_SendDiscoveryRequest(uint16_t target) {
 
 void LC_TransmitHandler(void) {
 	//fill TX buffer till no empty slots
+	//Some thread safeness
+	static volatile uint32_t mutex = 0;
+	if(mutex==1)
+		return;
+	mutex=1;
 	while (1) {
 		if (txFIFO_in == txFIFO_out)
 			return; /* Queue Empty - nothing to send*/
@@ -1433,6 +1438,8 @@ void LC_TransmitHandler(void) {
 			return; //CAN full
 		txFIFO_out = (txFIFO_out + 1) % LEVCAN_TX_SIZE;
 	}
+	mutex=0;
+
 }
 
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID) {
