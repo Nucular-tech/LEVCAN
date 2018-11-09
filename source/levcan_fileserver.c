@@ -49,17 +49,25 @@ extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
 extern LC_FileResult_t lcfclose(void* fileObject);
 extern uint32_t lcfsize(void* fileObject);
+
+extern void __attribute__((weak, alias("lc_fileserver_onreceive")))
+LC_FileServerOnReceive(void);
+
 //private functions
+void lc_fileserver_onreceive(void)
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t node);
 LC_FileResult_t deleteFSObject(fSrvObj* obj);
+
 //server request fifo
 fOpDataAdress_t fsFIFO[LEVCAN_MAX_TABLE_NODES];
 volatile uint16_t fsFIFO_in, fsFIFO_out;
+
 //server stored open files
 volatile fSrvObj* file_start;
 volatile fSrvObj* file_end;
 volatile int initFS = 0;
+
 
 void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 	if (size < 2 || initFS == 0)
@@ -67,13 +75,11 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	uint16_t* op = data;
 	uint16_t gotfifo = 0;
 	if (fsFIFO_in == ((fsFIFO_out - 1 + LEVCAN_MAX_TABLE_NODES) % LEVCAN_MAX_TABLE_NODES)) {
-		//todo send ACK full
+		sendAck(0, LC_FR_MemoryFull, node, header.Source);
 		return;//buffer full
 	}
 	fOpDataAdress_t* fsinput = &fsFIFO[fsFIFO_in];
-	//int empty = 0;
-	//if (fsFIFO_in == fsFIFO_out)
-	//	empty = 1;
+
 	//fill in data
 	switch (*op) {
 	case fOpOpen: {
@@ -125,7 +131,15 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		fsinput->Operation = *op;
 		fsinput->NodeID = header.Source;
 		fsFIFO_in = (fsFIFO_in + 1) % LEVCAN_MAX_TABLE_NODES;
+		//send request to process messages.
+		LC_FileServerOnReceive();
 	}
+}
+
+void lc_fileserver_onreceive(void){
+	//dummy function.
+	//make your own implementation of LC_FileServerOnReceive to use semaphore for main file process
+	//this should speed-up communication
 }
 
 //default ack
