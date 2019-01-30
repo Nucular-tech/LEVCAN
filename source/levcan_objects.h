@@ -36,16 +36,17 @@ enum {
 	LC_Obj_MotorHalls,
 	LC_Obj_CellsV,
 	LC_Obj_CellMinMax,
+	LC_Obj_CellBalance,
 	LC_Obj_UserActivity,
 	LC_Obj_ActiveFunctions,
 	LC_Obj_LightSensor,
 };
-
+//todo Make single struct V+A, and use it for BMS voltage+amp, Controller DCv+a, Controller Motor v+a
 typedef struct {
 	int32_t SupplyV; //mV
 	int32_t BatteryV; //mV
 } LC_Obj_SupplyVoltage_t;
-
+//todo make array type
 typedef struct {
 	int16_t Int12V; //mV
 	int16_t Int5V; //mV
@@ -176,8 +177,15 @@ typedef struct {
 } LC_Obj_CellsV_t;
 
 typedef struct {
+	uint8_t Number; //number of bits
+	uint8_t Balance[]; //bit field
+} LC_Obj_CellBalance_t;
+
+typedef struct {
 	int16_t CellMin; //mV
 	int16_t CellMax; //mV
+	int16_t TempMin; //Celsius degree
+	int16_t TempMax;
 } LC_Obj_CellMinMax_t;
 
 typedef struct {

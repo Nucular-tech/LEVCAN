@@ -54,7 +54,7 @@ extern void __attribute__((weak, alias("lc_fileserver_onreceive")))
 LC_FileServerOnReceive(void);
 
 //private functions
-void lc_fileserver_onreceive(void)
+void lc_fileserver_onreceive(void);
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t node);
 LC_FileResult_t deleteFSObject(fSrvObj* obj);
