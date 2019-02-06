@@ -1195,9 +1195,6 @@ LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint
 				sizeabs = size;
 
 			memcpy(obj.Address, data, sizeabs);
-			//string should be ended with zero
-			if (obj.Size < 0)
-				((uint8_t*) obj.Address)[sizeabs - 1] = 0;
 		}
 	} else {
 		ret = LC_ObjectError;
