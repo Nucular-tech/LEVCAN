@@ -16,17 +16,17 @@ typedef enum {
 
 enum {
 	LC_Obj_State = 0x300,
-	LC_Obj_SupplyVoltage,
+	LC_Obj_DCSupply,
+	LC_Obj_MotorSupply,
 	LC_Obj_InternalVoltage,
-	LC_Obj_Currents,
 	LC_Obj_Power,
 	LC_Obj_Temperature,
 	LC_Obj_RPM,
 	LC_Obj_RadSec,
 	LC_Obj_Speed,
-	LC_Obj_Controls,
-	LC_Obj_Throttle,
-	LC_Obj_Brake,
+	LC_Obj_ThrottleV,
+	LC_Obj_BrakeV,
+	LC_Obj_ControlFactor,
 	LC_Obj_SpeedCommand,
 	LC_Obj_TorqueCommand,
 	LC_Obj_Buttons,
@@ -41,11 +41,11 @@ enum {
 	LC_Obj_ActiveFunctions,
 	LC_Obj_LightSensor,
 };
-//todo Make single struct V+A, and use it for BMS voltage+amp, Controller DCv+a, Controller Motor v+a
+
 typedef struct {
-	int32_t SupplyV; //mV
-	int32_t BatteryV; //mV
-} LC_Obj_SupplyVoltage_t;
+	int32_t Voltage; //mV
+	int32_t Current; //mA
+} LC_Obj_Supply_t;
 //todo make array type
 typedef struct {
 	int16_t Int12V; //mV
@@ -53,11 +53,6 @@ typedef struct {
 	int16_t Int3_3V; //mV
 	int16_t IntREFV; //mV
 } LC_Obj_InternalVoltage_t;
-
-typedef struct {
-	int32_t DC_Current; //mA
-	int32_t Motor_Current; //mA
-} LC_Obj_Currents_t;
 
 typedef struct {
 	int32_t Watts; //W
@@ -83,35 +78,55 @@ typedef struct {
 } LC_Obj_RadSec_t;
 
 typedef struct {
-	int16_t Speed; //kmh
+	int16_t Speed;
 } LC_Obj_Speed_t;
 
 typedef struct {
 	int16_t ThrottleV; //mV
+} LC_Obj_ThrottleV_t;
+
+typedef struct {
 	int16_t BrakeV; //mV
+} LC_Obj_BrakeV_t;
+
+typedef struct {
+	float ControlFactor; //positive - throttle, negative - brake, range: -1...1
+}LC_Obj_ControlFactor_t;
+
+typedef struct {
 	union {
 		struct {
-			unsigned int Enable :1;
-			unsigned int Brake :1;
-			unsigned int Lock :1;
-			unsigned int Speed1 :1;
-			unsigned int Speed3 :1;
-			unsigned int Reverse :1;
-			unsigned int Cruise :1;
-			unsigned int TurnRight :1;
-			unsigned int TurnLeft :1;
-			unsigned int Horn :1;
-			unsigned int Button1 :1;
-			unsigned int Button2 :1;
-			unsigned int Button3 :1;
-			unsigned int Button4 :1;
-			unsigned int Button5 :1;
-			unsigned int Button6 :1;
+			unsigned int Enable :1; //0
+			unsigned int Brake :1; 	//1
+			unsigned int Lock :1;	//2
+			unsigned int Reverse :1;//3
+			unsigned int Speed :3;	//4-6
+			unsigned int Cruise :1;	//7
 		}LEVCAN_PACKED;
-		uint16_t Inputs;
+		uint16_t Buttons;
 	};
-	uint16_t Timeout; //control timeout
-} LC_Obj_Controls_t;
+	union {
+		struct {
+			unsigned int ExButton1 :1;
+			unsigned int ExButton2 :1;
+			unsigned int ExButton3 :1;
+			unsigned int ExButton4 :1;
+			unsigned int ExButton5 :1;
+			unsigned int ExButton6 :1;
+			unsigned int ExButton7 :1;
+			unsigned int ExButton8 :1;
+			unsigned int ExButton9 :1;
+			unsigned int ExButton10 :1;
+			unsigned int ExButton11 :1;
+			unsigned int ExButton12 :1;
+			unsigned int ExButton13 :1;
+			unsigned int ExButton14 :1;
+			unsigned int ExButton15 :1;
+			unsigned int ExButton16 :1;
+		}LEVCAN_PACKED;
+		uint16_t ExtraButtons;
+	};
+} LC_Obj_Buttons_t;
 
 typedef union {
 	struct {
@@ -119,9 +134,7 @@ typedef union {
 		unsigned int Lock :1;
 		unsigned int Throttle :1;
 		unsigned int Brake :1;
-		unsigned int Speed1 :1;
-		unsigned int Speed2 :1;
-		unsigned int Speed3 :1;
+		unsigned int Speed :3;
 		unsigned int Reverse :1;
 		unsigned int Cruise :1;
 		unsigned int TurnRight :1;
