@@ -14,7 +14,7 @@ typedef enum {
 	LC_Device_Debug = 0x80,
 } LC_Device_t;
 
-enum {
+typedef enum {
 	LC_Obj_State = 0x300,
 	LC_Obj_DCSupply,
 	LC_Obj_MotorSupply,
@@ -40,7 +40,7 @@ enum {
 	LC_Obj_UserActivity,
 	LC_Obj_ActiveFunctions,
 	LC_Obj_LightSensor,
-};
+} LC_Obj_Std_t;
 
 typedef struct {
 	int32_t Voltage; //mV
@@ -91,7 +91,7 @@ typedef struct {
 
 typedef struct {
 	float ControlFactor; //positive - throttle, negative - brake, range: -1...1
-}LC_Obj_ControlFactor_t;
+} LC_Obj_ControlFactor_t;
 
 typedef struct {
 	union {
@@ -99,7 +99,7 @@ typedef struct {
 			unsigned int Enable :1; //0
 			unsigned int Brake :1; 	//1
 			unsigned int Lock :1;	//2
-			unsigned int Reverse :1;//3
+			unsigned int Reverse :1;	//3
 			unsigned int Speed :3;	//4-6
 			unsigned int Cruise :1;	//7
 		}LEVCAN_PACKED;

@@ -44,7 +44,7 @@ typedef struct {
 } bufferedParam_t;
 
 //### Local functions ###
-void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 const char* extractName(const LC_ParameterAdress_t* param);
 uint16_t check_align(const LC_ParameterAdress_t* parameter);
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
@@ -164,7 +164,7 @@ int LC_SetParameterValue(const LC_ParameterAdress_t* parameter, int32_t value) {
 	return 0;
 }
 
-void proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
 	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = {0};
 #endif

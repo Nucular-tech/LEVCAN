@@ -58,7 +58,7 @@ typedef struct {
 #ifdef LEVCAN_STATIC_MEM
 		char Data[LEVCAN_OBJECT_DATASIZE];
 #else
-	char Data[sizeof(char*)];
+		char Data[sizeof(char*)];
 #endif
 	};
 	int32_t Length;
@@ -98,7 +98,10 @@ volatile uint16_t txFIFO_in, txFIFO_out;
 msgBuffered rxFIFO[LEVCAN_RX_SIZE];
 volatile uint16_t rxFIFO_in, rxFIFO_out;
 volatile uint16_t own_node_count;
-
+#ifdef DEBUG
+volatile uint32_t lc_collision_cntr = 0;
+volatile uint32_t lc_receive_ovfl_cntr = 0;
+#endif
 //#### PRIVATE FUNCTIONS ####
 void initialize(void);
 void configureFilters(void);
@@ -134,7 +137,7 @@ extern volatile uint8_t lc_eventButtonPressed;
 #endif
 #ifdef LEVCAN_PARAMETERS
 extern void __attribute__((weak, alias("lc_default_handler")))
-proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
 #endif
 #ifdef LEVCAN_FILESERVER
 extern void __attribute__((weak, alias("lc_default_handler")))
@@ -249,10 +252,10 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 #endif
 //todo add server also?!
 #ifdef LEVCAN_PARAMETERS
-	if (newnode->ShortName.Configurable && proceedParam != lc_default_handler) {
+	if (newnode->ShortName.Configurable && lc_proceedParam != lc_default_handler) {
 		//parameter editor
 		objparam = &newnode->SystemObjects[sysinx++];
-		objparam->Address = proceedParam;
+		objparam->Address = lc_proceedParam;
 		objparam->Attributes.Writable = 1;
 		objparam->Attributes.Function = 1;
 		objparam->Attributes.TCP = 1;
@@ -557,8 +560,12 @@ void LC_ReceiveHandler(void) {
 	//fast receive to clear input buffer, handle later in manager
 	while (CAN_Receive(&header.ToUint32, data, &length) == CANH_Ok) {
 		//buffer not full?
-		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE))
+		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE)) {
+#ifdef DEBUG
+			lc_receive_ovfl_cntr++;
+#endif
 			continue;
+		}
 		//store in rx buffer
 		msgBuffered* msgRX = &rxFIFO[rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
 		msgRX->data[0] = data[0];
@@ -886,7 +893,7 @@ void releaseObject(objBuffered* obj) {
 		objectBuffer[index].Previous = 0;
 		//save first free buffer in fast index
 		if (index < objectBuffer_freeID)
-			objectBuffer_freeID = index;
+		objectBuffer_freeID = index;
 	} else {
 #ifdef LEVCAN_TRACE
 		trace_printf("Delete object error\n");
@@ -1007,7 +1014,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 #ifndef LEVCAN_MEM_STATIC
 			//cleanup tx buffer also
 			if (object->Flags.TXcleanup)
-			lcfree(object->Pointer);
+				lcfree(object->Pointer);
 #endif
 			//delete object from memory chain, find new endings
 			deleteObject(object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
@@ -1116,7 +1123,7 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 		}
 #ifndef LEVCAN_MEM_STATIC
 		if (object->Pointer)
-		memcpy(&object->Pointer[object->Position], msg->data, msg->length);
+			memcpy(&object->Pointer[object->Position], msg->data, msg->length);
 #else
 		memcpy(&object->Data[object->Position], msg->data, msg->length);
 #endif
@@ -1184,7 +1191,7 @@ LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint
 			*(char**) obj.Address = data;
 			//cleanup if there was pointer
 			if (clean)
-			lcfree(clean);
+				lcfree(clean);
 			memfree = 0;
 #endif
 		} else {
@@ -1307,8 +1314,12 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t ind
 	if ((object->Attributes.TCP) || (object->Size > 8) || ((object->Size < 0) && (strnlen(dataAddr, 8) == 8))) {
 		//avoid dual same id
 		objBuffered* txProceed = findObject((void*) objTXbuf_start, index, object->NodeID, node->ShortName.NodeID);
-		if (txProceed)
+		if (txProceed) {
+#ifdef DEBUG
+			lc_collision_cntr++;
+#endif
 			return LC_Collision;
+		}
 
 		if (object->NodeID == node->ShortName.NodeID)
 			return LC_Collision;
@@ -1425,9 +1436,9 @@ void LC_TransmitHandler(void) {
 	//fill TX buffer till no empty slots
 	//Some thread safeness
 	static volatile uint32_t mutex = 0;
-	if(mutex==1)
+	if (mutex == 1)
 		return;
-	mutex=1;
+	mutex = 1;
 	while (1) {
 		if (txFIFO_in == txFIFO_out)
 			break; /* Queue Empty - nothing to send*/
@@ -1435,7 +1446,7 @@ void LC_TransmitHandler(void) {
 			break; //CAN full
 		txFIFO_out = (txFIFO_out + 1) % LEVCAN_TX_SIZE;
 	}
-	mutex=0;
+	mutex = 0;
 
 }
 
