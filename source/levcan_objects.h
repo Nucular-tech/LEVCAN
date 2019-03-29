@@ -162,13 +162,13 @@ typedef union {
 } LC_Obj_ActiveFunctions_t;
 
 typedef struct {
-	uint16_t WhUsed;
-	uint16_t WhUsedFromEn;
+	int32_t WhUsed;
+	int32_t WhUsedFromEn;
 } LC_Obj_WhUsed_t;
 
 typedef struct {
-	uint16_t WhStored;
-	uint16_t WhTotalStorage;
+	int32_t WhStored;
+	int32_t WhTotalStorage;
 } LC_Obj_WhStored_t;
 
 typedef struct {
