@@ -94,7 +94,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 			length = 512;
 		char* name = lcmalloc(length);
 		if (name) {
-			strncpy(name, fop->Name, 512);
+			strncpy(name, fop->Name, length);
 			name[length - 1] = 0;
 		}
 		fsinput->Data = name;
