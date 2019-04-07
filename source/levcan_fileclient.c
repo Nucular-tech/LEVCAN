@@ -236,7 +236,7 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, voi
 		writef->TotalBytes = towritenow;
 		memcpy(&writef->Data[0], &buffer[position], towritenow);
 		//setup packet size
-		ret = lc_client_sendwait(&writef, sizeof(fOpData_t) + towritenow, sender_node, &reid);
+		ret = lc_client_sendwait(writef, sizeof(fOpData_t) + towritenow, sender_node, &reid);
 
 		if (reid >= 0 && rxack[reid].Operation == fOpAck) {
 			//rxtoread[id].Position is bytes written
@@ -294,12 +294,23 @@ uint32_t LC_FileTell(void* sender_node) {
 uint32_t LC_FileSize(void* sender_node) {
 	int16_t reid;
 	//create buffer
-	fOpAckSize_t closef;
+	fOpOperation_t closef;
 	closef.Operation = fOpAckSize;
-	lc_client_sendwait(&closef, sizeof(fOpAckSize_t), sender_node, &reid);
+	lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
 	if (reid >= 0 && rxack[reid].Operation == fOpAck)
 		return rxack[reid].Position; //file size
 	return 0;
+}
+
+/// Truncates the file size.
+/// @param sender_node Own network node
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileTruncate(void* sender_node) {
+	int16_t reid;
+	//create buffer
+	fOpOperation_t closef;
+	closef.Operation = fOpTruncate;
+	return lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
 }
 
 /// Close an open file
@@ -328,9 +339,9 @@ LC_FileResult_t LC_FileClose(void* sender_node, uint8_t server_node) {
 	fnode[id] = server.NodeID;
 	int16_t reid;
 	//create buffer
-	fOpClose_t closef;
+	fOpOperation_t closef;
 	closef.Operation = fOpClose;
-	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpClose_t), sender_node, &reid);
+	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
 	//reset server
 	fnode[id] = LC_Broadcast_Address;
 	return result;

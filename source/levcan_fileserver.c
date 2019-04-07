@@ -49,6 +49,7 @@ extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
 extern LC_FileResult_t lcfwrite(void* fileObject, const char* buffer, uint32_t bytesToWrite, uint32_t* bytesWritten);
 extern LC_FileResult_t lcfclose(void* fileObject);
+extern LC_FileResult_t lcftruncate(void* fileObject);
 extern uint32_t lcfsize(void* fileObject);
 
 extern void __attribute__((weak, alias("lc_fileserver_onreceive")))
@@ -112,6 +113,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		gotfifo = 1;
 	}
 		break;
+	case fOpTruncate:
 	case fOpAckSize:
 	case fOpClose: {
 		fsinput->Position = 0;
@@ -358,6 +360,17 @@ void LC_FileServer(uint32_t tick, void* server) {
 			} else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(filesize, rslt, server, fsinput->NodeID);
+		}
+			break;
+		case fOpTruncate: {
+			fSrvObj* fileNode = findFile(fsinput->NodeID);
+			//do we have opened file for this node?
+			LC_FileResult_t rslt = LC_FR_Ok;
+			if (fileNode) {
+				rslt = lcftruncate(fileNode->FileObject);
+			} else
+				rslt = LC_FR_FileNotOpened;
+			sendAck(0, rslt, server, fsinput->NodeID);
 		}
 			break;
 		}

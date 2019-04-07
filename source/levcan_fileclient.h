@@ -61,6 +61,7 @@ LC_FileResult_t LC_FileClose(void* sender_node, uint8_t server_node);
 LC_FileResult_t LC_FileLseek(uint32_t position, void* sender_node);
 uint32_t LC_FileTell(void* sender_node);
 uint32_t LC_FileSize(void* sender_node);
+LC_FileResult_t LC_FileTruncate(void* sender_node);
 
 LC_NodeShortName_t LC_FindFileServer(uint16_t* scnt);
 LC_NodeShortName_t LC_FileGetServer(void* sender_node);
