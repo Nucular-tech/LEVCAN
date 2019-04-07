@@ -49,10 +49,10 @@ void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		int id = LC_GetMyNodeIndex(node);
 		//check if it is okay
 		if (id >= 0) {
-			if (rxtoread[id].Buffer != 0 && fop->TotalRead <= rxtoread[id].ReadBytes && rxtoread[id].Position == UINT32_MAX
-					&& size == (int32_t) (fop->TotalRead + sizeof(fOpData_t))) {
-				memcpy(rxtoread[id].Buffer, fop->Data, fop->TotalRead);
-				rxtoread[id].ReadBytes = fop->TotalRead;
+			if (rxtoread[id].Buffer != 0 && fop->TotalBytes <= rxtoread[id].ReadBytes && rxtoread[id].Position == UINT32_MAX
+					&& size == (int32_t) (fop->TotalBytes + sizeof(fOpData_t))) {
+				memcpy(rxtoread[id].Buffer, fop->Data, fop->TotalBytes);
+				rxtoread[id].ReadBytes = fop->TotalBytes;
 				rxtoread[id].Error = fop->Error;
 				rxtoread[id].Position = fop->Position; //trigger
 			} else {
@@ -103,7 +103,6 @@ LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node,
 /// @param btr Number of bytes to read
 /// @param br Number of bytes read
 /// @param sender_node Own network node
-/// @param server_node Server id, can be LC_Broadcast_Address to find first one
 /// @return LC_FileResult_t
 LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* sender_node) {
 	uint16_t attempt;
@@ -200,85 +199,52 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 	return ret;
 }
 
-LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btr, uint32_t* br, void* sender_node) {
+/// Writes data to a file.
+/// @param buffer Pointer to the data to be written
+/// @param btw Number of bytes to write
+/// @param bw Pointer to the variable to return number of bytes written
+/// @param sender_node Own network node
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, void* sender_node) {
+	LC_FileResult_t ret = LC_FR_Ok;
 	uint16_t attempt;
-	LC_NodeShortName_t server;
+	char writedata[LEVCAN_OBJECT_DATASIZE + sizeof(fOpData_t)];
 
-	if (br == 0 || buffer == 0)
+	if (bw == 0 || buffer == 0)
 		return LC_FR_InvalidParameter;
 	//reset
-	*br = 0;
+	*bw = 0;
 	attempt = 0;
 
 	int id = LC_GetMyNodeIndex(sender_node);
 	if (id < 0)
 		return LC_FR_NodeOffline;
-	//look for any server node
-	if (fnode[id] == LC_Broadcast_Address)
-		return LC_FR_FileNotOpened;
-	else
-		server = LC_GetNode(fnode[id]);
-	//checks
-	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
-		return LC_FR_NodeOffline;
 
-	fOpWrite_t readf;
-	readf.Operation = fOpWrite;
-	LC_ObjectRecord_t rec = { 0 };
-	rec.Attributes.TCP = 1;
-	rec.Attributes.Priority = LC_Priority_Low;
-	rec.NodeID = server.NodeID;
-	rec.Address = &readf;
-	rec.Size = sizeof(fOpRead_t);
-	//reset
-	*br = 0;
-	attempt = 0;
-	LC_FileResult_t ret = LC_FR_Ok;
+	fOpData_t* writef = (fOpData_t*) &writedata;
+	writef->Operation = fOpData;
+	int16_t reid; //dummy
 
-	for (uint32_t position = 0; position < btr;) {
-		uint32_t toreadnow = btr - position;
+	for (uint32_t position = 0; position < btw;) {
+		uint32_t towritenow = btw - position;
 		uint32_t globalpos = position + fpos[id];
-		//finish?
-		if (toreadnow == 0)
-			return LC_Ok;
-		if (toreadnow > LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t))
-			toreadnow = LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t);
-		if (toreadnow > INT16_MAX)
-			toreadnow = INT16_MAX;
-		//Prepare receiver
-		rxtoread[id].Buffer = (char*) &buffer[position];
-		rxtoread[id].Error = 0;
-		rxtoread[id].Position = -1;
-		rxtoread[id].ReadBytes = toreadnow;
-		readf.ToBeWrite = toreadnow;
-		readf.Position = globalpos; //add global position
 
-		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
-		//send error?
-		if (sr) {
-			if (sr == LC_BufferFull)
-				ret = LC_FR_NetworkBusy;
-			else if (sr == LC_MallocFail)
-				ret = LC_FR_MemoryFull;
-			else
-				ret = LC_FR_NetworkError;
-			break;
-		}
-		//wait 500ms
-		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
-			lcdelay(1);
-			if (rxtoread[id].Position != UINT32_MAX)
-				break;
-		}
-		//just make some checks
-		if (rxtoread[id].Position != UINT32_MAX && rxtoread[id].Position == globalpos && rxtoread[id].ReadBytes <= toreadnow) {
-			//received something, data already filled, move pointers
-			position += rxtoread[id].ReadBytes;
-			*br += rxtoread[id].ReadBytes;
+		if (towritenow > LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t))
+			towritenow = LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t);
+
+		//copy data to fOpData_t
+		writef->Position = globalpos;
+		writef->TotalBytes = towritenow;
+		memcpy(&writef->Data[0], &buffer[position], towritenow);
+		//setup packet size
+		ret = lc_client_sendwait(&writef, sizeof(fOpData_t) + towritenow, sender_node, &reid);
+
+		if (reid >= 0 && rxack[reid].Operation == fOpAck) {
+			//rxtoread[id].Position is bytes written
+			position += rxack[reid].Position;
+			*bw += rxack[reid].Position;
 			attempt = 0;
-			if (rxtoread[id].ReadBytes < toreadnow)
-				break; //receive finished
-
+			if (rxack[reid].Position < towritenow)
+				break; //not all written
 		} else {
 			attempt++;
 			if (attempt > 3) {
@@ -287,14 +253,11 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btr, uint32_t* br, voi
 			}
 		}
 		//got some errs?
-		if (rxtoread[id].Error && rxtoread[id].Error != LC_FR_NetworkError) {
-			ret = rxtoread[id].Error;
+		if (ret != LC_FR_NetworkError) {
 			break;
 		}
 	}
-	//reset buffer
-	fpos[id] += *br;
-	rxtoread[id].Buffer = 0;
+	fpos[id] += *bw;
 	return ret;
 }
 

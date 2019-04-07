@@ -52,7 +52,7 @@ typedef struct {
 	uint16_t Operation;
 	uint16_t Error;
 	uint32_t Position;
-	uint16_t TotalRead;
+	uint16_t TotalBytes;
 	char Data[];
 } fOpData_t;
 

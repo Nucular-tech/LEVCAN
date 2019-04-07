@@ -47,6 +47,7 @@ extern LC_FileResult_t lcfopen(void** fileObject, char* name, LC_FileAccess_t mo
 extern uint32_t lcftell(void* fileObject);
 extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
 extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
+extern LC_FileResult_t lcfwrite(void* fileObject, const char* buffer, uint32_t bytesToWrite, uint32_t* bytesWritten);
 extern LC_FileResult_t lcfclose(void* fileObject);
 extern uint32_t lcfsize(void* fileObject);
 
@@ -68,7 +69,6 @@ volatile fSrvObj* file_start;
 volatile fSrvObj* file_end;
 volatile int initFS = 0;
 
-
 void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 	if (size < 2 || initFS == 0)
 		return;
@@ -76,7 +76,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	uint16_t gotfifo = 0;
 	if (fsFIFO_in == ((fsFIFO_out - 1 + LEVCAN_MAX_TABLE_NODES) % LEVCAN_MAX_TABLE_NODES)) {
 		sendAck(0, LC_FR_MemoryFull, node, header.Source);
-		return;//buffer full
+		return; //buffer full
 	}
 	fOpDataAdress_t* fsinput = &fsFIFO[fsFIFO_in];
 
@@ -89,11 +89,16 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		fsinput->Size = 0;
 		//copy name to new buffer
 		size_t length = strlen(fop->Name) + 1;
+		//todo make error if name too long
+		if (length > 512)
+			length = 512;
 		char* name = lcmalloc(length);
-		name[0] = 0;
-		if (name && length < 512)
-			strcpy(name, fop->Name);
+		if (name) {
+			strncpy(name, fop->Name, 512);
+			name[length - 1] = 0;
+		}
 		fsinput->Data = name;
+
 		//add to fifo
 		gotfifo = 1;
 	}
@@ -126,6 +131,26 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 			gotfifo = 1;
 		}
 	}
+		break;
+	case fOpData: {
+		fOpData_t* fop = data;
+		//fill data
+		fsinput->Size = fop->TotalBytes;
+		//check data size
+		if (size == (int32_t) (fop->TotalBytes + sizeof(fOpData_t))) {
+			//copy data to new buffer
+			char* data_write = lcmalloc(fop->TotalBytes);
+			if (data_write)
+				memcpy(data_write, &fop->Data[0], fop->TotalBytes);
+			fsinput->Data = data_write;
+		} else {
+			fsinput->Data = 0;
+			fsinput->Size = 0;
+		}
+		//add to fifo
+		gotfifo = 1;
+	}
+		break;
 	}
 	if (gotfifo) {
 		fsinput->Operation = *op;
@@ -136,10 +161,10 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 	}
 }
 
-void lc_fileserver_onreceive(void){
-	//dummy function.
-	//make your own implementation of LC_FileServerOnReceive to use semaphore for main file process
-	//this should speed-up communication
+void lc_fileserver_onreceive(void) {
+//dummy function.
+//make your own implementation of LC_FileServerOnReceive to use semaphore for main file process
+//this should speed-up communication
 }
 
 //default ack
@@ -247,7 +272,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				result = lcfread(fileNode->FileObject, &buffer->Data[0], btr, &btr);
 				buffer->Error = result;
 				buffer->Position = filepos;
-				buffer->TotalRead = btr;
+				buffer->TotalBytes = btr;
 				//send
 				rec.Address = buffer;
 				rec.Size = sizeof(fOpData_t) + btr;
@@ -258,6 +283,45 @@ void LC_FileServer(uint32_t tick, void* server) {
 			} else {
 				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
 			}
+		}
+			break;
+		case fOpData: {
+			fSrvObj* fileNode = findFile(fsinput->NodeID);
+			//do we have opened/created file for this node?
+			if (fileNode) {
+				fileNode->Timeout = 0;
+
+				if (fsinput->Size == 0) {
+					sendAck(0, LC_FR_NetworkError, server, fsinput->NodeID);
+				} else if (fsinput->Data == 0) {
+					sendAck(0, LC_FR_MemoryFull, server, fsinput->NodeID);
+				} else {
+					//get current position
+					uint32_t filepos = lcftell(fileNode->FileObject);
+					LC_FileResult_t result = 0;
+					//try to move
+					if (fsinput->Position != filepos) {
+						result = lcflseek(fileNode->FileObject, fsinput->Position);
+						filepos = lcftell(fileNode->FileObject);
+					}
+					if (result) {
+						//error happened
+						sendAck(0, result, server, fsinput->NodeID);
+						continue;
+					}
+					uint32_t btw = fsinput->Size;
+					if (fsinput->Position != filepos)
+						btw = 0; //pointer not moved
+					//write file
+					result = lcfwrite(fileNode->FileObject, fsinput->Data, btw, &btw);
+					sendAck(btw, result, server, fsinput->NodeID);
+				}
+			} else {
+				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
+			}
+			//free data
+			if (fsinput->Data)
+				lcfree(fsinput->Data);
 		}
 			break;
 		case fOpClose: {
@@ -398,7 +462,7 @@ LC_FileResult_t deleteFSObject(fSrvObj* obj) {
 	}
 
 	LC_FileResult_t resul = lcfclose(obj->FileObject);
-	//free this object
+//free this object
 	lcfree(obj);
 	return resul;
 }
