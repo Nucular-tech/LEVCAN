@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <math.h>
 
 #include "levcan_fileclient.h"
@@ -95,6 +96,8 @@ LC_FileResult_t LC_FileOpen(char* name, LC_FileAccess_t mode, void* sender_node,
 	LC_FileResult_t ret = lc_client_sendwait(openf, datasize, sender_node, &reid);
 	if (ret != LC_FR_Ok)
 		fnode[id] = LC_Broadcast_Address; //reset server
+	else
+		fpos[id] = 0;
 	return ret;
 }
 
@@ -259,6 +262,29 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, voi
 	}
 	fpos[id] += *bw;
 	return ret;
+}
+
+/// Writes line to a file.
+/// @param buffer Pointer to the data to be written
+/// @param btw Number of bytes to write
+/// @param bw Pointer to the variable to return number of bytes written
+/// @param sender_node Own network node
+/// @return LC_FileResult_t
+LC_FileResult_t LC_FilePrintf(void* sender_node, const char* format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	static char buf[256]; //todo config
+
+	LC_FileResult_t res = 0;
+	uint32_t size = 0;
+	// Print to the local buffer
+	size = vsnprintf(buf, sizeof(buf), format, ap);
+	if (size > 0) {
+		// Transfer the buffer to the server
+		res = LC_FileWrite(buf, size, &size, sender_node);
+	}
+	va_end(ap);
+	return res;
 }
 
 ///  Move read/write pointer, Expand size

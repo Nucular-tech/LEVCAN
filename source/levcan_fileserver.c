@@ -138,6 +138,7 @@ void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* dat
 		fOpData_t* fop = data;
 		//fill data
 		fsinput->Size = fop->TotalBytes;
+		fsinput->Position = fop->Position;
 		//check data size
 		if (size == (int32_t) (fop->TotalBytes + sizeof(fOpData_t))) {
 			//copy data to new buffer
