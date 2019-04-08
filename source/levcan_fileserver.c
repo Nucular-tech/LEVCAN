@@ -310,14 +310,14 @@ void LC_FileServer(uint32_t tick, void* server) {
 					if (result) {
 						//error happened
 						sendAck(0, result, server, fsinput->NodeID);
-						continue;
+					} else {
+						uint32_t btw = fsinput->Size;
+						if (fsinput->Position != filepos)
+							btw = 0; //pointer not moved
+						//write file
+						result = lcfwrite(fileNode->FileObject, fsinput->Data, btw, &btw);
+						sendAck(btw, result, server, fsinput->NodeID);
 					}
-					uint32_t btw = fsinput->Size;
-					if (fsinput->Position != filepos)
-						btw = 0; //pointer not moved
-					//write file
-					result = lcfwrite(fileNode->FileObject, fsinput->Data, btw, &btw);
-					sendAck(btw, result, server, fsinput->NodeID);
 				}
 			} else {
 				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
@@ -331,9 +331,10 @@ void LC_FileServer(uint32_t tick, void* server) {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Ok;
-			if (fileNode)
+			if (fileNode) {
+				lcfclose(fileNode->FileObject);
 				rslt = deleteFSObject(fileNode);
-			else
+			} else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(0, rslt, server, fsinput->NodeID);
 		}
@@ -381,7 +382,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 	if (timesec >= 1000) {
 		timesec -= 1000;
 		fSrvObj* next;
-		for (fSrvObj* obj = file_start; obj != 0; obj = next) {
+		for (fSrvObj* obj = (fSrvObj*)file_start; obj != 0; obj = next) {
 			next = (fSrvObj*) obj->Next;
 			obj->Timeout++;
 			//5 minute delete
@@ -399,19 +400,19 @@ LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t
 
 	switch (error) {
 	case LC_FR_MemoryFull:
-		rec.Address = &fask_mem_out;
+		rec.Address = (void*)&fask_mem_out;
 		rec.Size = sizeof(fask_mem_out);
 		LC_SendMessage(sender, &rec, LC_SYS_FileServer);
 		return LC_FR_Ok;
 
 	case LC_FR_TooManyOpenFiles:
-		rec.Address = &fask_open_many;
+		rec.Address = (void*)&fask_open_many;
 		rec.Size = sizeof(fask_open_many);
 		LC_SendMessage(sender, &rec, LC_SYS_FileServer);
 		return LC_FR_Ok;
 
 	case LC_FR_Denied:
-		rec.Address = &fask_deni;
+		rec.Address = (void*)&fask_deni;
 		rec.Size = sizeof(fask_deni);
 		LC_SendMessage(sender, &rec, LC_SYS_FileServer);
 		return LC_FR_Ok;
@@ -419,7 +420,7 @@ LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t
 	fOpAck_t* ack = lcmalloc(sizeof(fOpAck_t));
 	if (ack == 0) {
 		//can't do anything, memory fail
-		rec.Address = &fask_mem_out;
+		rec.Address = (void*)&fask_mem_out;
 		rec.Size = sizeof(fask_mem_out);
 		LC_SendMessage(sender, &rec, LC_SYS_FileServer);
 		return LC_FR_MemoryFull;
@@ -438,7 +439,7 @@ LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t
 }
 
 fSrvObj* findFile(uint8_t source) {
-	fSrvObj* obj = file_start;
+	fSrvObj* obj = (fSrvObj*)file_start;
 	while (obj) {
 		//search file for specified nodeID
 		if (obj->NodeID == source) {

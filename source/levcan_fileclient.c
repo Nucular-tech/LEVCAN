@@ -15,6 +15,10 @@
 #include "levcan_fileclient.h"
 #include "levcan_filedef.h"
 
+#ifndef LEVCAN_FILE_DATASIZE
+#define LEVCAN_FILE_DATASIZE LEVCAN_OBJECT_DATASIZE
+#endif
+
 #if LEVCAN_OBJECT_DATASIZE < 16
 #error "Too small LEVCAN_OBJECT_DATASIZE size for file io!"
 #endif
@@ -27,6 +31,10 @@ volatile fRead_t rxtoread[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile uint32_t fpos[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile uint8_t fnode[LEVCAN_MAX_OWN_NODES] = { [0 ... (LEVCAN_MAX_OWN_NODES - 1)] = LC_Broadcast_Address };
 volatile fOpAck_t rxack[LEVCAN_MAX_OWN_NODES] = { 0 };
+#ifdef LEVCAN_BUFFER_FILEPRINTF
+char lc_printf_buffer[LEVCAN_FILE_DATASIZE - sizeof(fOpData_t)];
+uint32_t lc_printf_size = 0;
+#endif
 
 void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
 	if (size < 2)
@@ -145,8 +153,8 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 		//finish?
 		if (toreadnow == 0)
 			return LC_Ok;
-		if (toreadnow > LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t))
-			toreadnow = LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t);
+		if (toreadnow > LEVCAN_FILE_DATASIZE - sizeof(fOpData_t))
+			toreadnow = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
 		if (toreadnow > INT16_MAX)
 			toreadnow = INT16_MAX;
 		//Prepare receiver
@@ -211,7 +219,7 @@ LC_FileResult_t LC_FileRead(char* buffer, uint32_t btr, uint32_t* br, void* send
 LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, void* sender_node) {
 	LC_FileResult_t ret = LC_FR_Ok;
 	uint16_t attempt;
-	char writedata[LEVCAN_OBJECT_DATASIZE + sizeof(fOpData_t)];
+	char writedata[btw + sizeof(fOpData_t)];
 
 	if (bw == 0 || buffer == 0)
 		return LC_FR_InvalidParameter;
@@ -231,8 +239,8 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, voi
 		uint32_t towritenow = btw - position;
 		uint32_t globalpos = position + fpos[id];
 
-		if (towritenow > LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t))
-			towritenow = LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t);
+		if (towritenow > LEVCAN_FILE_DATASIZE - sizeof(fOpData_t))
+			towritenow = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
 
 		//copy data to fOpData_t
 		writef->Position = globalpos;
@@ -273,19 +281,56 @@ LC_FileResult_t LC_FileWrite(const char* buffer, uint32_t btw, uint32_t* bw, voi
 LC_FileResult_t LC_FilePrintf(void* sender_node, const char* format, ...) {
 	va_list ap;
 	va_start(ap, format);
-	static char buf[256]; //todo config
+	static char buf[(LEVCAN_FILE_DATASIZE > 256) ? 256 : LEVCAN_FILE_DATASIZE];
 
-	LC_FileResult_t res = 0;
+	LC_FileResult_t result = 0;
 	uint32_t size = 0;
 	// Print to the local buffer
 	size = vsnprintf(buf, sizeof(buf), format, ap);
+#ifdef LEVCAN_BUFFER_FILEPRINTF
+	char* bufref = buf;
+	uint32_t copysize = 0;
+	uint32_t maxsize = 0;
+	do {
+		//send only full buffer
+		if (lc_printf_size == sizeof(lc_printf_buffer)) {
+			result = LC_FileWrite(lc_printf_buffer, lc_printf_size, &lc_printf_size, sender_node);
+			lc_printf_size = 0;
+		}
+		//fill buffer
+		if (size > 0) {
+			maxsize = sizeof(lc_printf_buffer) - lc_printf_size;
+			if (size > maxsize)
+				copysize = maxsize;
+			else
+				copysize = size;
+			memcpy(&lc_printf_buffer[lc_printf_size], bufref, copysize);
+			lc_printf_size += copysize;
+			size -= copysize;
+			bufref += copysize;
+		}
+	} while (lc_printf_size == sizeof(lc_printf_buffer));
+#else
 	if (size > 0) {
 		// Transfer the buffer to the server
-		res = LC_FileWrite(buf, size, &size, sender_node);
+		result = LC_FileWrite(buf, size, &size, sender_node);
 	}
+#endif
 	va_end(ap);
+	return result;
+}
+
+#ifdef LEVCAN_BUFFER_FILEPRINTF
+LC_FileResult_t LC_FilePrintFlush(void* sender_node) {
+	LC_FileResult_t res = 0;
+	uint32_t size = 0;
+
+	if (lc_printf_size > 0)
+		res = LC_FileWrite(lc_printf_buffer, lc_printf_size, &size, sender_node);
+	lc_printf_size = 0;
 	return res;
 }
+#endif
 
 ///  Move read/write pointer, Expand size
 /// @param sender_node Own network node
