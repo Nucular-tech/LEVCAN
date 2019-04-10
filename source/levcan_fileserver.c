@@ -332,7 +332,6 @@ void LC_FileServer(uint32_t tick, void* server) {
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Ok;
 			if (fileNode) {
-				lcfclose(fileNode->FileObject);
 				rslt = deleteFSObject(fileNode);
 			} else
 				rslt = LC_FR_FileNotOpened;
