@@ -1,22 +1,9 @@
 /*
  * CAN driver library by V.Sukhoparov
  */
-#ifdef  STM32F10X_MD
-#include "stm32f10x.h"
-#endif
-#if defined(STM32F405XX) || defined(STM32F446)
-#include "stm32f4xx.h"
-#endif
-
+#include "stdint.h"
 
 #pragma once
-
-#ifdef PCBV2_2
-#define CAN_HAL_BTR 0x001b0002
-#endif
-#ifdef PCBV2_1
-#define CAN_HAL_BTR 0x001a0002
-#endif
 
 #ifndef CAN1
 #define CAN1 CAN
@@ -73,7 +60,8 @@ typedef union {
 	}__attribute__((packed));
 } CAN_IR; //identifier register
 
-void CAN_Init(void);
+void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16_t sample_point);
+void CAN_Init(uint32_t BTR);
 void CAN_Start(void);
 
 void CAN_FiltersClear(void);
@@ -82,6 +70,5 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo);
 CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo);
 void CAN_FilterEditOff(void);
 
-//CAN_Status CAN_SendIndex(uint32_t index32);
 CAN_Status CAN_Send(uint32_t index32, uint32_t* data, uint16_t length);
 CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length);
