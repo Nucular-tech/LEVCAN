@@ -110,6 +110,7 @@ enum {
 	LC_SYS_Shutdown,
 	LC_SYS_FileServer,
 	LC_SYS_FileClient,
+	LC_SYS_SaveData,
 	LC_SYS_End,
 };
 
