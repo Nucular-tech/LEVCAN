@@ -37,6 +37,8 @@ uint32_t lc_printf_size = 0;
 #endif
 
 void proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+	(void) header; //no warnings
+
 	if (size < 2)
 		return;
 	uint16_t* op = data;

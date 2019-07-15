@@ -295,7 +295,10 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 }
 
 void lc_default_handler(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
-
+	(void) node; //no warnings
+	(void) header;
+	(void) data;
+	(void) size;
 }
 
 void initialize(void) {
@@ -338,6 +341,8 @@ int32_t getTXqueueSize(void) {
 }
 
 void proceedAddressClaim(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+	(void) size; //no warnings
+	(void) node;
 
 	if (header.Request) {
 		//TODO what to do with null?

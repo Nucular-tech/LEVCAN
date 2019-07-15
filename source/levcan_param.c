@@ -51,6 +51,7 @@ bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
 void proceed_RX(void);
 const char* skipspaces(const char* s);
 int32_t pow10i(int32_t dec);
+int printIntegerWithDecimal(char* buffer, int32_t value, uint8_t decimals);
 //### Local variables ###
 bufferedParam_t receive_buffer[LEVCAN_PARAM_QUEUE_SIZE];
 volatile uint16_t receiveFIFO_in = 0, receiveFIFO_out = 0;
@@ -359,6 +360,8 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 #ifdef LEVCAN_TRACE
 				if (sizefail)
 				trace_printf("Parameter RX size fail\n");
+#else
+				(void)sizefail; //no warnings
 #endif
 			}
 		}
@@ -551,11 +554,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 		int32_t val = LC_GetParameterValue(parameter);
 		strcpy(buffer, parameter->Name);
 		strcat(buffer, equality);
-		if (parameter->Decimal) {
-			uint32_t powww = pow10i(parameter->Decimal);
-			sprintf(buffer + strlen(buffer), "%ld.%ld", val / powww, val % powww);
-		} else
-			sprintf(buffer + strlen(buffer), "%ld", val);
+		printIntegerWithDecimal(buffer + strlen(buffer), val, parameter->Decimal);
 		strcat(buffer, "\n");
 	}
 		break;
@@ -575,6 +574,38 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 	}
 
 	return;
+}
+
+int printIntegerWithDecimal(char* buffer, int32_t value, uint8_t decimals) {
+	char buf[16];
+	int32_t powww = pow10i(decimals);
+	int32_t integer = value / powww;
+	int32_t decimal = value % powww;
+	int isize = 0;
+
+	if (decimals == 0) {
+		isize = sprintf(buf, "%ld", integer);
+	} else {
+		isize = sprintf(buf, "%ld.", integer);
+		int dsize = sprintf(buf + isize, "%ld", decimal);
+		//add extra 0's
+		if (dsize < decimals) {
+			for (int i = 0; i <= decimals; i++) {
+				if (i > dsize) {
+					//add 0's after point
+					buf[isize + decimals - i] = '0';
+				} else {
+					//move decimal part in buffer including zero
+					buf[isize + decimals - i] = buf[isize + dsize - i];
+				}
+			}
+			//buf[isize + decimals] = 0;
+		}
+	}
+	//total size
+	isize = isize + decimals;
+	memcpy(buffer, buf, isize + 1); //+null
+	return isize;
 }
 
 /// Tryes to get value for specified parameter with string value
@@ -640,9 +671,9 @@ int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const cha
 }
 
 int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
-	//index [0] is directory entry, dont scan
+//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "]#=\n\r");
-	//remove space ending
+//remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
 	for (uint16_t i = 0; i < node->DirectoriesSize; i++) {
@@ -655,9 +686,9 @@ int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
 }
 
 int16_t LC_IsParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
-	//index [0] is directory entry, dont scan
+//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "#=\n\r");
-	//remove space ending
+//remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
 	for (uint16_t i = 1; i < ((LC_ParameterDirectory_t*) node->Directories)[directory].Size; i++) {
@@ -703,7 +734,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 	int16_t dir = *directory;
 	int16_t indx = -1;
 
-	//skip first spaces
+//skip first spaces
 	const char* line = skipspaces(input);
 	int linelength = strcspn(line, "\n\r");
 	if (linelength > 0) {
@@ -740,7 +771,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 		return 0;
 	*index = indx;
 	*directory = dir;
-	//go to new line
+//go to new line
 	return line + strcspn(line, "\n\r");
 }
 
