@@ -40,6 +40,8 @@ typedef enum {
 	LC_Obj_UserActivity,
 	LC_Obj_ActiveFunctions,
 	LC_Obj_LightSensor,
+	LC_Obj_AccelerometerRaw,
+	LC_Obj_Accelerometer,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -97,12 +99,12 @@ typedef struct {
 	union {
 		struct {
 			unsigned int Enable :1; //0
-			unsigned int Brake :1; 	//1
-			unsigned int Lock :1;	//2
-			unsigned int Reverse :1;	//3
-			unsigned int Speed :3;	//4-6
-			unsigned int Cruise :1;	//7
-		}LEVCAN_PACKED;
+			unsigned int Brake :1;//1
+			unsigned int Lock :1;//2
+			unsigned int Reverse :1;//3
+			unsigned int Speed :3;//4-6
+			unsigned int Cruise :1;//7
+		}LEVCAN_PACKED ;
 		uint16_t Buttons;
 	};
 	union {
@@ -123,7 +125,7 @@ typedef struct {
 			unsigned int ExButton14 :1;
 			unsigned int ExButton15 :1;
 			unsigned int ExButton16 :1;
-		}LEVCAN_PACKED;
+		}LEVCAN_PACKED ;
 		uint16_t ExtraButtons;
 	};
 } LC_Obj_Buttons_t;
@@ -157,7 +159,7 @@ typedef union {
 		unsigned int Service :1;
 		unsigned int FanActive :1;
 		unsigned int HeaterActive :1;
-	}LEVCAN_PACKED;
+	}LEVCAN_PACKED ;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
 
@@ -205,3 +207,9 @@ typedef struct {
 	uint16_t Normalized; //0-1024
 	uint16_t SensorVoltage; //mV
 } LC_Obj_LightSensor_t;
+
+typedef struct {
+	int16_t AxisX;
+	int16_t AxisY;
+	int16_t AxisZ;
+} LC_Obj_Accelerometer_t;

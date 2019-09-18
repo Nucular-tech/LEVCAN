@@ -14,7 +14,7 @@
 #include <math.h>
 #include <ctype.h>
 
-extern void *lcmalloc(uint32_t xWantedSize);
+extern void* lcmalloc(uint32_t xWantedSize);
 extern void lcfree(void *pv);
 
 typedef struct {
@@ -29,6 +29,16 @@ typedef struct {
 	char Literals[];
 } parameterValuePacked_t;
 
+typedef union {
+	void *Void;
+	uint8_t *Uint8;
+	int8_t *Int8;
+	uint16_t *Uint16;
+	int16_t *Int16;
+	int32_t *Int32;
+	float *Float;
+} padress_t;
+
 typedef struct {
 	int32_t Value;
 	uint8_t Directory;
@@ -36,40 +46,58 @@ typedef struct {
 } storeValuePacked_t;
 
 typedef struct {
-	LC_ParameterValue_t* Param;
-	void* Node;
+	LC_ParameterValue_t *Param;
+	void *Node;
 	uint16_t Directory;
 	uint16_t Source;
 	uint8_t Full;
 } bufferedParam_t;
 
 //### Local functions ###
-void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
-const char* extractName(const LC_ParameterAdress_t* param);
-uint16_t check_align(const LC_ParameterAdress_t* parameter);
+void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
+const char* extractName(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index);
+uint16_t check_align(const LC_ParameterAdress_t *parameter);
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
 void proceed_RX(void);
-const char* skipspaces(const char* s);
+const char* skipspaces(const char *s);
 int32_t pow10i(int32_t dec);
-int printIntegerWithDecimal(char* buffer, int32_t value, uint8_t decimals);
+int printIntegerWithDecimal(char *buffer, int32_t value, uint8_t decimals);
 //### Local variables ###
 bufferedParam_t receive_buffer[LEVCAN_PARAM_QUEUE_SIZE];
 volatile uint16_t receiveFIFO_in = 0, receiveFIFO_out = 0;
 volatile uint16_t receive_busy = 0;
 
-const char* extractName(const LC_ParameterAdress_t* param) {
-	const char* source = 0;
-	//try to get name
-	if (param->Name)
-		source = param->Name;
-	else if ((param->ParamType & PT_typeMask) == PT_dir) {
-		//it is directory and no name, try get name from child
-		if (param->Address && ((LC_ParameterAdress_t*) param->Address)[0].Name) {
-			//this is directory, it's name can stored in child [0] directory index
-			source = ((LC_ParameterAdress_t*) param->Address)[0].Name;
-		} else
-			source = "Unknown directory"; //directory should have a name anyway
+const char* extractName(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index) {
+	const char *unknown = "Unknown directory";
+	const char *source = 0;
+
+	//todo check directory index is in range
+	const LC_ParameterDirectory_t *dir = &directories[directory];
+
+	if (index < dir->Size) {
+		const LC_ParameterAdress_t *param = &dir->Address[index];
+
+		if ((param->ParamType & PT_typeMask) == PT_dirArray) {
+			//extracting name from array type directory
+			int32_t index = dir->Index;
+			char **index_name = (char**) param->Name;
+			if (index_name) {
+				source = index_name[index];
+			} else
+				source = unknown; //directory should have a name anyway
+		} else if (param->Name)
+			source = param->Name;
+		else if ((param->ParamType & PT_typeMask) == PT_dir) {
+			//it is directory and no name, try get name from child
+			if (param->Address) {
+				source = extractName(directories, param->Min, 0);
+			}
+		}
+
 	}
+	if (source == 0)
+		source = unknown; //directory should have a name anyway
+
 	return source;
 }
 
@@ -87,7 +115,7 @@ bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
 	return 0;
 }
 
-uint16_t check_align(const LC_ParameterAdress_t* parameter) {
+uint16_t check_align(const LC_ParameterAdress_t *parameter) {
 //parameter should be aligned to avoid memory fault, this may happen when int16 accessed as int32
 	uint16_t align = 0;
 	switch (parameter->ValueType) {
@@ -109,63 +137,91 @@ uint16_t check_align(const LC_ParameterAdress_t* parameter) {
 	return align;
 }
 
-int32_t LC_GetParameterValue(const LC_ParameterAdress_t* parameter) {
+int32_t LC_GetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index) {
+	//todo check directory index is in range
+	const LC_ParameterDirectory_t *dir = &directories[directory];
 	int32_t value = 0;
-	if (((uint32_t) parameter->Address > UINT8_MAX) && (check_align(parameter) == 0)) {
-		switch (parameter->ValueType) {
-		default:
-			value = (*(uint8_t*) (parameter->Address));
-			break;
-		case VT_int8:
-			value = (*(int8_t*) parameter->Address);
-			break;
-		case VT_int16:
-			value = (*(int16_t*) parameter->Address);
-			break;
-		case VT_uint16:
-			value = (*(uint16_t*) parameter->Address);
-			break;
-		case VT_int32:
-			value = (*(int32_t*) parameter->Address);
-			break;
+	if (index < dir->Size) {
+		const LC_ParameterAdress_t *parameter = &dir->Address[index];
+
+		if (((uint32_t) parameter->Address > UINT8_MAX) && (check_align(parameter) == 0)) {
+			padress_t adress;
+			//cast type
+			adress.Void = parameter->Address;
+			uint16_t val_index = 0;
+			//get array index if it is array
+			if ((dir->Address[0].ParamType & PT_typeMask) == PT_dirArray)
+				val_index = dir->Index;
+
+			switch (parameter->ValueType) {
+			default:
+				value = adress.Uint8[val_index];
+				break;
+			case VT_int8:
+				value = adress.Int8[val_index];
+				break;
+			case VT_uint16:
+				value = adress.Uint16[val_index];
+				break;
+			case VT_int16:
+				value = adress.Int16[val_index];
+				break;
+			case VT_int32:
+				value = adress.Int32[val_index];
+				break;
 #ifdef LEVCAN_USE_FLOAT
-		case VT_float:
-			value = (*(float*) parameter->Address) * powf(10, parameter->Decimal);
-			break;
+			case VT_float:
+				value = adress.Float[val_index] * powf(10, parameter->Decimal);
+				break;
 #endif
+			}
 		}
 	}
 	return value;
 }
 
-int LC_SetParameterValue(const LC_ParameterAdress_t* parameter, int32_t value) {
-	if (value > parameter->Max || value < parameter->Min || (parameter->ParamType & PT_readonly) || parameter->Address == 0)
-		return 1;
-	if (((uint32_t) parameter->Address > UINT8_MAX) && (check_align(parameter) == 0))
-		switch (parameter->ValueType) {
-		case VT_int8:
-		case VT_uint8:
-			(*(uint8_t*) parameter->Address) = (uint8_t) value;
-			break;
-		case VT_int16:
-		case VT_uint16:
-			(*(uint16_t*) parameter->Address) = (uint16_t) value;
-			break;
-		case VT_int32:
-			(*(uint32_t*) parameter->Address) = (uint32_t) value;
-			break;
+int LC_SetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index, int32_t value) {
+	const LC_ParameterDirectory_t *dir = &directories[directory];
+	if (index < dir->Size) {
+		const LC_ParameterAdress_t *parameter = &dir->Address[index];
+
+		if (value > parameter->Max || value < parameter->Min || (parameter->ParamType & PT_readonly) || parameter->Address == 0)
+			return 1;
+		if (((uint32_t) parameter->Address > UINT8_MAX) && (check_align(parameter) == 0)) {
+			padress_t adress;
+			//cast type
+			adress.Void = parameter->Address;
+			uint16_t val_index = 0;
+			//get array index if it is array
+			if ((dir->Address[0].ParamType & PT_typeMask) == PT_dirArray)
+				val_index = dir->Index;
+
+			switch (parameter->ValueType) {
+			case VT_int8:
+			case VT_uint8:
+				adress.Uint8[val_index] = (uint8_t) value;
+				break;
+			case VT_int16:
+			case VT_uint16:
+				adress.Uint16[val_index] = (uint16_t) value;
+				break;
+			case VT_int32:
+				adress.Int32[val_index] = value;
+				break;
 #ifdef LEVCAN_USE_FLOAT
-		case VT_float:
-			(*(float*) parameter->Address) = (float) value / powf(10, parameter->Decimal);
-			break;
+			case VT_float:
+				adress.Float[val_index] = (float) value / powf(10, parameter->Decimal);
+				break;
 #endif
-		default:
-			break;
+			default:
+				break;
+			}
 		}
+	}
 	return 0;
 }
 
-void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
 	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = {0};
 #endif
@@ -182,13 +238,14 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 		uint16_t pddir = ((uint8_t*) data)[1];
 		//trace_printf("Request: id=%d, dir=%d\n", pdindex,pddir);
 		int32_t value = 0;
-		LC_ParameterDirectory_t* directory = &(((LC_ParameterDirectory_t*) node->Directories)[pddir]);
+		LC_ParameterDirectory_t *directories = (LC_ParameterDirectory_t*) node->Directories;
+		LC_ParameterDirectory_t *directory = &(directories[pddir]);
 		//array correctly filled?
 		if (pddir < node->DirectoriesSize && pdindex < directory->Size) {
-			const LC_ParameterAdress_t* parameter = &directory->Address[pdindex];
+			const LC_ParameterAdress_t *parameter = &directory->Address[pdindex];
 			int32_t namelength = 0, formatlength = 0;
 			//check strings
-			const char* s_name = extractName(parameter);
+			const char *s_name = extractName(directories, pddir, pdindex);
 			if (s_name)
 				namelength = strlen(s_name);
 			if (parameter->Formatting)
@@ -204,13 +261,13 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 #endif
 			int32_t totalsize = sizeof(parameterValuePacked_t) + namelength + formatlength + 2;
 #ifndef LEVCAN_MEM_STATIC
-			parameterValuePacked_t* param_to_send = lcmalloc(totalsize);
+			parameterValuePacked_t *param_to_send = lcmalloc(totalsize);
 #endif
 			if (param_to_send == 0)
 				return; // nothing to do so here
 
 			//just copy-paste
-			value = LC_GetParameterValue(parameter);
+			value = LC_GetParameterValue(directories, pddir, pdindex);
 			param_to_send->Value = value;
 			param_to_send->Min = parameter->Min;
 			if (pdindex == 0)
@@ -219,13 +276,16 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 				param_to_send->Max = parameter->Max;
 			param_to_send->Decimal = parameter->Decimal;
 			param_to_send->Step = parameter->Step;
-			param_to_send->ParamType = parameter->ParamType;
+			if (parameter->ParamType == PT_dirArray) //backward compatibility
+				param_to_send->ParamType = PT_dir;
+			else
+				param_to_send->ParamType = parameter->ParamType;
 			param_to_send->Index = pdindex;
 			param_to_send->Directory = pddir;
 
 			param_to_send->Literals[0] = 0;
 			if (namelength)
-				strncat(param_to_send->Literals, extractName(parameter), namelength);
+				strncat(param_to_send->Literals, s_name, namelength);
 
 			param_to_send->Literals[namelength + 1] = 0; //next string start
 			if (formatlength)
@@ -265,7 +325,7 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 			storeValuePacked_t sendvalue;
 			sendvalue.Index = pdindex;
 			sendvalue.Directory = pddir;
-			sendvalue.Value = LC_GetParameterValue(&((LC_ParameterDirectory_t*) node->Directories)[pddir].Address[pdindex]);
+			sendvalue.Value = LC_GetParameterValue(((LC_ParameterDirectory_t*) node->Directories), pddir, pdindex);
 
 			txrec.Address = &sendvalue;
 			txrec.Size = sizeof(storeValuePacked_t) + 1;
@@ -277,15 +337,15 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 		break;
 	case sizeof(storeValuePacked_t): {
 		//store value
-		storeValuePacked_t* store = data;
+		storeValuePacked_t *store = data;
 		if (store->Directory < node->DirectoriesSize && store->Index < ((LC_ParameterDirectory_t*) node->Directories)[store->Directory].Size)
-			LC_SetParameterValue(&((LC_ParameterDirectory_t*) node->Directories)[store->Directory].Address[store->Index], store->Value);
+			LC_SetParameterValue(((LC_ParameterDirectory_t*) node->Directories), store->Directory, store->Index, store->Value);
 	}
 		break;
 	case sizeof(storeValuePacked_t) + 1: {
 		//update requested value
-		storeValuePacked_t* update = data;
-		bufferedParam_t* receiver = findReceiver(update->Directory, update->Index, header.Source);
+		storeValuePacked_t *update = data;
+		bufferedParam_t *receiver = findReceiver(update->Directory, update->Index, header.Source);
 		//somebody receiving
 		if (receiver) {
 			receiver->Param->Value = update->Value;
@@ -299,8 +359,8 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 	default: {
 		if (size > (int32_t) sizeof(parameterValuePacked_t)) {
 			//parameter full receive
-			parameterValuePacked_t* param_received = data;
-			bufferedParam_t* receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
+			parameterValuePacked_t *param_received = data;
+			bufferedParam_t *receiver = findReceiver(param_received->Directory, param_received->Index, header.Source);
 			int sizefail = 0;
 			//somebody receiving
 			if (receiver) {
@@ -313,7 +373,7 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 				//receiver->Param->Index=param_received->Index; //should be equal
 				int32_t maxstr = size - sizeof(parameterValuePacked_t);
 				//extract name
-				char* clean = receiver->Param->Name;
+				char *clean = receiver->Param->Name;
 				int strpos = 0;
 				if (param_received->Literals[0] != 0) {
 					int length = strnlen(param_received->Literals, 128);
@@ -361,7 +421,7 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 				if (sizefail)
 				trace_printf("Parameter RX size fail\n");
 #else
-				(void)sizefail; //no warnings
+				(void) sizefail; //no warnings
 #endif
 			}
 		}
@@ -376,8 +436,8 @@ void lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data,
 }
 
 /// Returns and prints local parameters information
-LC_ParameterTableSize_t LC_ParamInfo_Size(void* vnode) {
-	LC_NodeDescription_t* node = vnode;
+LC_ParameterTableSize_t LC_ParamInfo_Size(void *vnode) {
+	LC_NodeDescription_t *node = vnode;
 	int32_t size = 0;
 	int32_t textsize = 0;
 	int32_t parameters = 0;
@@ -410,7 +470,7 @@ LC_ParameterTableSize_t LC_ParamInfo_Size(void* vnode) {
 /// @param dir Directory index
 /// @param sender_node Sender node
 /// @param receiver_node Receiver ID node
-LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node) {
+LC_Return_t LC_ParameterSet(LC_ParameterValue_t *paramv, uint16_t dir, void *sender_node, uint16_t receiver_node) {
 	//send function will use fast send, so it is  safe
 	storeValuePacked_t store = { 0 };
 	store.Directory = dir;
@@ -432,12 +492,12 @@ LC_Return_t LC_ParameterSet(LC_ParameterValue_t* paramv, uint16_t dir, void* sen
 /// @param sender_node Sender node, who is asking for
 /// @param receiver_node Receiver ID node
 /// @param full	0 - request just value, 1 - request full parameter information.
-LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t* paramv, uint16_t dir, void* sender_node, uint16_t receiver_node, uint8_t full) {
+LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t *paramv, uint16_t dir, void *sender_node, uint16_t receiver_node, uint8_t full) {
 	//todo reentrancy
 	if (receiveFIFO_in == ((receiveFIFO_out - 1 + LEVCAN_PARAM_QUEUE_SIZE) % LEVCAN_PARAM_QUEUE_SIZE))
 		return LC_BufferFull;
 
-	bufferedParam_t* receive = &receive_buffer[receiveFIFO_in];
+	bufferedParam_t *receive = &receive_buffer[receiveFIFO_in];
 	receive->Param = paramv;
 	receive->Directory = dir;
 	receive->Source = receiver_node;
@@ -497,10 +557,10 @@ void proceed_RX(void) {
 	}
 }
 
-const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t* node, int16_t dir, int16_t index) {
+const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t *node, int16_t dir, int16_t index) {
 	//array correctly filled?
 	if (index >= 0 && dir >= 0 && dir < node->DirectoriesSize) {
-		LC_ParameterDirectory_t* directory = &(((LC_ParameterDirectory_t*) node->Directories)[dir]);
+		LC_ParameterDirectory_t *directory = &(((LC_ParameterDirectory_t*) node->Directories)[dir]);
 		if (index < directory->Size) {
 			return &directory->Address[index];
 		}
@@ -510,17 +570,22 @@ const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t* no
 
 #ifdef LEVCAN_PARAMETERS_PARSING
 
-const char* equality = " = ";
+const char *equality = " = ";
 
-void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
+void LC_PrintParam(char *buffer, const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index) {
 	if (buffer == 0)
 		return;
+	const LC_ParameterDirectory_t *dir = &directories[directory];
+	if (index >= dir->Size)
+		return;
+	const LC_ParameterAdress_t *parameter = &dir->Address[index];
 	//for string this enough
 	buffer[0] = 0;
 	switch (parameter->ParamType & PT_typeMask) {
+	case PT_dirArray:
 	case PT_dir: {
 		strcat(buffer, "\n[");
-		strcat(buffer, extractName(parameter));
+		strcat(buffer, extractName(directories, directory, index));
 		strcat(buffer, "]\n");
 	}
 		break;
@@ -528,7 +593,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 		strcpy(buffer, parameter->Name);
 		strcat(buffer, equality);
 
-		int32_t val = LC_GetParameterValue(parameter);
+		int32_t val = LC_GetParameterValue(directories, directory, index);
 
 		const char *position = parameter->Formatting;
 		for (int i = 0; (i < val); i++) {
@@ -540,7 +605,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 		if (position == 0) {
 			sprintf(buffer + strlen(buffer), "%ld", val);
 		} else {
-			char* end = strchr(position, '\n'); //search for buffer end
+			char *end = strchr(position, '\n'); //search for buffer end
 			if (end) {
 				strncat(buffer, position, end - position);
 			} else
@@ -551,7 +616,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 		break;
 
 	case PT_value: {
-		int32_t val = LC_GetParameterValue(parameter);
+		int32_t val = LC_GetParameterValue(directories, directory, index);
 		strcpy(buffer, parameter->Name);
 		strcat(buffer, equality);
 		printIntegerWithDecimal(buffer + strlen(buffer), val, parameter->Decimal);
@@ -560,7 +625,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 		break;
 
 	case PT_bool: {
-		int32_t val = LC_GetParameterValue(parameter);
+		int32_t val = LC_GetParameterValue(directories, directory, index);
 		strcpy(buffer, parameter->Name);
 		strcat(buffer, equality);
 		if (val)
@@ -576,7 +641,7 @@ void LC_PrintParam(char* buffer, const LC_ParameterAdress_t* parameter) {
 	return;
 }
 
-int printIntegerWithDecimal(char* buffer, int32_t value, uint8_t decimals) {
+int printIntegerWithDecimal(char *buffer, int32_t value, uint8_t decimals) {
 	char buf[16];
 	int32_t powww = pow10i(decimals);
 	int32_t integer = value / powww;
@@ -612,13 +677,13 @@ int printIntegerWithDecimal(char* buffer, int32_t value, uint8_t decimals) {
 /// @param parameter
 /// @param value output
 /// @return 0 if ok, 1 if error
-int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const char* s, int32_t* value) {
+int LC_GetParameterValueFromStr(const LC_ParameterAdress_t *parameter, const char *s, int32_t *value) {
 	int32_t integer = 0;
 	int type = parameter->ParamType & PT_typeMask;
 	s = skipspaces(s);
 	int length = strcspn(s, "#\n\r");
 	if (type == PT_enum || type == PT_bool) {
-		const char* haystack = parameter->Formatting;
+		const char *haystack = parameter->Formatting;
 		if (parameter->ParamType == PT_bool)
 			haystack = "OFF\nON";
 		//end is comment or newline
@@ -670,14 +735,14 @@ int LC_GetParameterValueFromStr(const LC_ParameterAdress_t* parameter, const cha
 	return 1;
 }
 
-int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
+int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s) {
 //index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "]#=\n\r");
 //remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
 	for (uint16_t i = 0; i < node->DirectoriesSize; i++) {
-		const LC_ParameterAdress_t* directory = &((LC_ParameterDirectory_t*) node->Directories)[i].Address[0];
+		const LC_ParameterAdress_t *directory = &((LC_ParameterDirectory_t*) node->Directories)[i].Address[0];
 		if (directory->Name && strncmp(directory->Name, s, searchlen) == 0) {
 			return i;
 		}
@@ -685,7 +750,7 @@ int16_t LC_IsDirectory(LC_NodeDescription_t* node, const char* s) {
 	return -1;
 }
 
-int16_t LC_IsParameter(LC_NodeDescription_t* node, const char* s, uint8_t directory) {
+int16_t LC_IsParameter(LC_NodeDescription_t *node, const char *s, uint8_t directory) {
 //index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "#=\n\r");
 //remove space ending
@@ -693,7 +758,7 @@ int16_t LC_IsParameter(LC_NodeDescription_t* node, const char* s, uint8_t direct
 		;
 	for (uint16_t i = 1; i < ((LC_ParameterDirectory_t*) node->Directories)[directory].Size; i++) {
 		//todo carefully check types
-		const LC_ParameterAdress_t* param = &((LC_ParameterDirectory_t*) node->Directories)[directory].Address[i];
+		const LC_ParameterAdress_t *param = &((LC_ParameterDirectory_t*) node->Directories)[directory].Address[i];
 		//other directories entry don't have name in the pointer, so they will be skipped
 		if (param->Name && (strncmp(param->Name, s, searchlen) == 0)) {
 			return i;
@@ -728,14 +793,14 @@ void LC_ParametersPrintAll(void* vnode) {
 /// @param directory
 /// @param index
 /// @return
-const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input, int16_t* directory, int16_t* index, int32_t* value) {
+const char* LC_ParseParameterLine(LC_NodeDescription_t *node, const char *input, int16_t *directory, int16_t *index, int32_t *value) {
 	if (index == 0 || directory == 0 || value == 0 || input == 0 || node == 0)
 		return 0;
 	int16_t dir = *directory;
 	int16_t indx = -1;
 
 //skip first spaces
-	const char* line = skipspaces(input);
+	const char *line = skipspaces(input);
 	int linelength = strcspn(line, "\n\r");
 	if (linelength > 0) {
 		if (*line == '[') {
@@ -761,7 +826,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 			if (indx > 0 && line[endofname] == '=') {
 				//endofname is '=' here
 				line += endofname + 1;
-				const LC_ParameterAdress_t* addr = LC_GetParameterAdress(node, dir, indx);
+				const LC_ParameterAdress_t *addr = LC_GetParameterAdress(node, dir, indx);
 				if (addr && LC_GetParameterValueFromStr(addr, line, value)) {
 					indx = -1;
 				}
@@ -777,7 +842,7 @@ const char* LC_ParseParameterLine(LC_NodeDescription_t* node, const char* input,
 
 #endif
 
-const char* skipspaces(const char* s) {
+const char* skipspaces(const char *s) {
 	for (; isspace(*s); s++)
 		;
 	return s;
