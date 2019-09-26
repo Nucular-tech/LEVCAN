@@ -397,7 +397,7 @@ void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data,
 				//extract formatting
 				clean = receiver->Param->Formatting;
 				if (param_received->Literals[strpos] != 0 && strpos < maxstr) {
-					int length = strnlen(&param_received->Literals[strpos], 128);
+					int length = strnlen(&param_received->Literals[strpos], 512);
 					if (strpos + length > maxstr) {
 						//broken size!
 						sizefail = 1;
