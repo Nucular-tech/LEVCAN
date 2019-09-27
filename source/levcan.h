@@ -147,6 +147,10 @@ typedef enum {
 	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout
 } LC_Return_t;
 
+typedef enum {
+	LC_SD_Shutdown, LC_SD_Reboot, LC_SD_Sleep
+} LC_Shutdown_t;
+
 enum {
 	LC_Preffered_Address = 0, LC_Normal_Address = 64, LC_Null_Address = 126, LC_Broadcast_Address = 127,
 };
