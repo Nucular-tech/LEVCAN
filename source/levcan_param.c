@@ -109,7 +109,8 @@ bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source) {
 		int out = receiveFIFO_out;
 		receiveFIFO_out = (receiveFIFO_out + 1) % LEVCAN_PARAM_QUEUE_SIZE;
 
-		if (receive_buffer[out].Param != 0 && receive_buffer[out].Directory == dir && receive_buffer[out].Param->Index == index && receive_buffer[out].Source == source)
+		if (receive_buffer[out].Param != 0 && receive_buffer[out].Directory == dir && receive_buffer[out].Param->Index == index
+				&& receive_buffer[out].Source == source)
 			return &receive_buffer[out];
 	}
 	return 0;
@@ -736,14 +737,14 @@ int LC_GetParameterValueFromStr(const LC_ParameterAdress_t *parameter, const cha
 }
 
 int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s) {
-//index [0] is directory entry, dont scan
+	//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "]#=\n\r");
-//remove space ending
+	//remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
 	for (uint16_t i = 0; i < node->DirectoriesSize; i++) {
-		const LC_ParameterAdress_t *directory = &((LC_ParameterDirectory_t*) node->Directories)[i].Address[0];
-		if (directory->Name && strncmp(directory->Name, s, searchlen) == 0) {
+		const char *name = extractName((LC_ParameterDirectory_t*) node->Directories, i, 0);
+		if (name && strncmp(name, s, searchlen) == 0) {
 			return i;
 		}
 	}
@@ -751,16 +752,16 @@ int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s) {
 }
 
 int16_t LC_IsParameter(LC_NodeDescription_t *node, const char *s, uint8_t directory) {
-//index [0] is directory entry, dont scan
+	//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "#=\n\r");
-//remove space ending
+	//remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
 	for (uint16_t i = 1; i < ((LC_ParameterDirectory_t*) node->Directories)[directory].Size; i++) {
 		//todo carefully check types
-		const LC_ParameterAdress_t *param = &((LC_ParameterDirectory_t*) node->Directories)[directory].Address[i];
+		const char *name = extractName((LC_ParameterDirectory_t*) node->Directories, directory, i);
 		//other directories entry don't have name in the pointer, so they will be skipped
-		if (param->Name && (strncmp(param->Name, s, searchlen) == 0)) {
+		if (name && (strncmp(name, s, searchlen) == 0)) {
 			return i;
 		}
 	}
