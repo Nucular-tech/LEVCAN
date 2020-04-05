@@ -42,6 +42,7 @@ typedef enum {
 	LC_Obj_LightSensor,
 	LC_Obj_AccelerometerRaw,
 	LC_Obj_Accelerometer,
+	LC_Obj_ControlFactorInt,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -94,6 +95,11 @@ typedef struct {
 typedef struct {
 	float ControlFactor; //positive - throttle, negative - brake, range: -1...1
 } LC_Obj_ControlFactor_t;
+
+typedef struct {
+	uint16_t BrakeFactor; //0...10000
+	uint16_t ThrottleFactor; //0...10000
+} LC_Obj_ControlFactorInt_t;
 
 typedef struct {
 	union {

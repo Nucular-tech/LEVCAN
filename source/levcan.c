@@ -17,13 +17,13 @@
 extern void *lcmalloc(uint32_t size);
 extern void lcfree(void *pointer);
 #else
-							#ifndef LEVCAN_STATIC_MEM
-							#define LEVCAN_STATIC_MEM
-							//undefine
-							#define lcmalloc(...)
-							#define lcfree(...)
-							#endif
-							#endif
+#ifndef LEVCAN_STATIC_MEM
+#define LEVCAN_STATIC_MEM
+//undefine
+#define lcmalloc(...)
+#define lcfree(...)
+#endif
+#endif
 
 #if LEVCAN_OBJECT_DATASIZE < 8
 							#error "LEVCAN_OBJECT_DATASIZE should be more than one 8 byte for static memory"
@@ -43,7 +43,7 @@ typedef union {
 		unsigned Parity :1;
 		unsigned RTS_CTS :1;
 		unsigned Priority :2;
-	}LEVCAN_PACKED;
+	} LEVCAN_PACKED;
 } headerPacked_t;
 
 typedef struct {
@@ -54,10 +54,10 @@ typedef struct {
 
 typedef struct {
 	union {
-		char* Pointer;
+		char *Pointer;
 #ifdef LEVCAN_STATIC_MEM
-							char Data[LEVCAN_OBJECT_DATASIZE];
-							#else
+		char Data[LEVCAN_OBJECT_DATASIZE];
+#else
 		char Data[sizeof(char*)];
 #endif
 	};
@@ -70,8 +70,8 @@ typedef struct {
 		unsigned TCP :1;
 		unsigned TXcleanup :1;
 	} Flags LEVCAN_PACKED;
-	intptr_t* Next;
-	intptr_t* Previous;
+	intptr_t *Next;
+	intptr_t *Previous;
 } objBuffered;
 
 enum {
@@ -84,15 +84,15 @@ enum {
 
 //#### PRIVATE VARIABLES ####
 #ifdef LEVCAN_STATIC_MEM
-							objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
-							int16_t objectBuffer_freeID;
-							#endif
+objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
+int16_t objectBuffer_freeID;
+#endif
 LC_NodeDescription_t own_nodes[LEVCAN_MAX_OWN_NODES];
 LC_NodeTable_t node_table[LEVCAN_MAX_TABLE_NODES];
-volatile objBuffered* objTXbuf_start = 0;
-volatile objBuffered* objTXbuf_end = 0;
-volatile objBuffered* objRXbuf_start = 0;
-volatile objBuffered* objRXbuf_end = 0;
+volatile objBuffered *objTXbuf_start = 0;
+volatile objBuffered *objTXbuf_end = 0;
+volatile objBuffered *objRXbuf_start = 0;
+volatile objBuffered *objRXbuf_end = 0;
 msgBuffered txFIFO[LEVCAN_TX_SIZE];
 volatile uint16_t txFIFO_in, txFIFO_out;
 msgBuffered rxFIFO[LEVCAN_RX_SIZE];
@@ -106,38 +106,38 @@ volatile uint32_t lc_receive_ovfl_cntr = 0;
 void initialize(void);
 void configureFilters(void);
 void addAddressFilter(uint16_t address);
-void proceedAddressClaim(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
-void claimFreeID(LC_NodeDescription_t* node);
+void proceedAddressClaim(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
+void claimFreeID(LC_NodeDescription_t *node);
 
 int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b);
 LC_NodeDescription_t* findNode(uint16_t nodeID);
-LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t* node, uint8_t read_write, uint8_t nodeID);
+LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t *node, uint8_t read_write, uint8_t nodeID);
 
 headerPacked_t headerPack(LC_Header_t header);
 LC_Header_t headerUnpack(headerPacked_t header);
 
 LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length);
-uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg);
-uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request);
-LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint8_t memfree);
-void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end);
+uint16_t objectRXproceed(objBuffered *object, msgBuffered *msg);
+uint16_t objectTXproceed(objBuffered *object, headerPacked_t *request);
+LC_Return_t objectRXfinish(headerPacked_t header, char *data, int32_t size, uint8_t memfree);
+void deleteObject(objBuffered *obj, objBuffered **start, objBuffered **end);
 #ifdef LEVCAN_STATIC_MEM
-							objBuffered* getFreeObject(void);
-							void releaseObject(objBuffered* obj);
-							#endif
+objBuffered* getFreeObject(void);
+void releaseObject(objBuffered *obj);
+#endif
 
 int32_t getTXqueueSize(void);
-uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t* ownNode);
-objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source);
+uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t *ownNode);
+objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint8_t source);
 
-void lc_default_handler(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+void lc_default_handler(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
 //#### EXTERNAL MODULES #### todo: other compiler support
 #ifdef LEVCAN_EVENTS
 extern volatile uint8_t lc_eventButtonPressed;
 #endif
 #ifdef LEVCAN_PARAMETERS
 extern void __attribute__((weak, alias("lc_default_handler")))
-lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
 #endif
 #ifdef LEVCAN_FILESERVER
 							extern void __attribute__((weak, alias("lc_default_handler")))
@@ -145,11 +145,11 @@ lc_proceedParam(LC_NodeDescription_t* node, LC_Header_t header, void* data, int3
 							#endif
 #ifdef LEVCAN_FILECLIENT
 extern void __attribute__((weak, alias("lc_default_handler")))
-proceedFileClient(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+proceedFileClient(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
 #endif
 //#### FUNCTIONS
-const LC_Object_t prclaim = {
-		.Address = proceedAddressClaim, .Attributes.Readable = 1, .Attributes.Writable = 1, .Attributes.Function = 1, .Index = LC_SYS_AddressClaimed, .Size = 8 };
+const LC_Object_t prclaim = { .Address = proceedAddressClaim, .Attributes.Readable = 1, .Attributes.Writable = 1, .Attributes.Function = 1, .Index =
+		LC_SYS_AddressClaimed, .Size = 8 };
 uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	initialize();
 
@@ -169,7 +169,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 		node.VendorName = 0;
 
 	//save node in table
-	LC_NodeDescription_t* newnode = 0;
+	LC_NodeDescription_t *newnode = 0;
 	int i = 0;
 	for (; i < LEVCAN_MAX_OWN_NODES; i++) {
 		if (own_nodes[i].ShortName.NodeID == LC_Broadcast_Address)
@@ -204,7 +204,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	memset(newnode->SystemObjects, 0, sizeof(newnode->SystemObjects));
 	//now setup system calls
 	uint16_t sysinx = 0;
-	LC_Object_t* objparam;
+	LC_Object_t *objparam;
 	//adress claim, main network function
 	//newnode->SystemObjects[sysinx++] = prclaim;
 	objparam = &newnode->SystemObjects[sysinx++];
@@ -294,7 +294,7 @@ uintptr_t* LC_CreateNode(LC_NodeInit_t node) {
 	return (uintptr_t*) &own_nodes[i];
 }
 
-void lc_default_handler(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void lc_default_handler(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size) {
 	(void) node; //no warnings
 	(void) header;
 	(void) data;
@@ -322,14 +322,14 @@ void initialize(void) {
 		node_table[i].ShortName.NodeID = LC_Broadcast_Address;
 
 #ifdef LEVCAN_STATIC_MEM
-							objectBuffer_freeID = 0;
-							for (int i = 0; i < LEVCAN_OBJECT_SIZE; i++) {
-							objectBuffer[i].Position = -1;    //empty object
-							objectBuffer[i].Pointer = 0;
-							objectBuffer[i].Next = 0;
-							objectBuffer[i].Previous = 0;
-							}
-							#endif
+	objectBuffer_freeID = 0;
+	for (int i = 0; i < LEVCAN_OBJECT_SIZE; i++) {
+		objectBuffer[i].Position = -1;    //empty object
+		objectBuffer[i].Pointer = 0;
+		objectBuffer[i].Next = 0;
+		objectBuffer[i].Previous = 0;
+	}
+#endif
 	configureFilters();
 }
 
@@ -340,7 +340,7 @@ int32_t getTXqueueSize(void) {
 		return txFIFO_in + (LEVCAN_TX_SIZE - txFIFO_out);
 }
 
-void proceedAddressClaim(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void proceedAddressClaim(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size) {
 	(void) size; //no warnings
 	(void) node;
 
@@ -368,7 +368,7 @@ void proceedAddressClaim(LC_NodeDescription_t* node, LC_Header_t header, void* d
 		}
 	} else {
 		//got some other claim
-		uint32_t* toui = data;
+		uint32_t *toui = data;
 		if (toui != 0)
 			LC_AddressClaimHandler((LC_NodeShortName_t ) { .ToUint32[0] = toui[0], .ToUint32[1] = toui[1], .NodeID = header.Source }, LC_RX);
 	}
@@ -545,8 +545,8 @@ int16_t compareNode(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 		return 1;
 }
 
-objBuffered* findObject(objBuffered* array, uint16_t msgID, uint8_t target, uint8_t source) {
-	objBuffered* obj = array;
+objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint8_t source) {
+	objBuffered *obj = array;
 	while (obj) {
 		//same source and same ID ?
 		//one ID&source can send only one message length a time
@@ -572,7 +572,7 @@ void LC_ReceiveHandler(void) {
 			continue;
 		}
 		//store in rx buffer
-		msgBuffered* msgRX = &rxFIFO[rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
+		msgBuffered *msgRX = &rxFIFO[rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
 		msgRX->data[0] = data[0];
 		msgRX->data[1] = data[1];
 		msgRX->length = length;
@@ -652,7 +652,7 @@ void LC_NetworkManager(uint32_t time) {
 		if (hdr.Request) {
 			if (hdr.RTS_CTS == 0 && hdr.EoM == 0) {
 				//Remote transfer request, try to create new TX object
-				LC_NodeDescription_t* node = findNode(hdr.Target);
+				LC_NodeDescription_t *node = findNode(hdr.Target);
 				LC_ObjectRecord_t obj = findObjectRecord(hdr.MsgID, rxFIFO[rxFIFO_out].length, node, Read, hdr.Source);
 				obj.NodeID = hdr.Source;    //receiver
 				if (obj.Attributes.Function && obj.Address) {
@@ -664,7 +664,7 @@ void LC_NetworkManager(uint32_t time) {
 				} else {
 					//check for existing objects, dual request denied
 					//ToDo is this best way? maybe reset tx?
-					objBuffered* txProceed = findObject((void*) objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
+					objBuffered *txProceed = findObject((void*) objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
 					if (txProceed == 0) {
 						obj.Attributes.TCP |= hdr.Parity;    //force TCP mode if requested
 						LC_SendMessage((intptr_t*) node, &obj, hdr.MsgID);
@@ -676,7 +676,7 @@ void LC_NetworkManager(uint32_t time) {
 				}
 			} else {
 				//find existing TX object, tcp clear-to-send and end-of-msg-ack
-				objBuffered* TXobj = findObject((void*) objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
+				objBuffered *TXobj = findObject((void*) objTXbuf_start, hdr.MsgID, hdr.Source, hdr.Target);
 				if (TXobj)
 					objectTXproceed(TXobj, &hdr);
 			}
@@ -698,7 +698,7 @@ void LC_NetworkManager(uint32_t time) {
 					}
 				} else {
 					//find existing RX object, delete in case we get new RequestToSend
-					objBuffered* RXobj = findObject((void*) objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
+					objBuffered *RXobj = findObject((void*) objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
 					if (RXobj) {
 						lcfree(RXobj->Pointer);
 						deleteObject(RXobj, (void*) &objRXbuf_start, (void*) &objRXbuf_end);
@@ -707,8 +707,8 @@ void LC_NetworkManager(uint32_t time) {
 #ifndef LEVCAN_MEM_STATIC
 					objBuffered* newRXobj = (objBuffered*) lcmalloc(sizeof(objBuffered));
 #else
-							objBuffered* newRXobj = getFreeObject();
-							#endif
+					objBuffered *newRXobj = getFreeObject();
+#endif
 					if (newRXobj == 0) {
 						//get next buffer index
 						rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
@@ -747,7 +747,7 @@ void LC_NetworkManager(uint32_t time) {
 				}
 			} else {
 				//find existing RX object
-				objBuffered* RXobj = findObject((void*) objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
+				objBuffered *RXobj = findObject((void*) objRXbuf_start, hdr.MsgID, hdr.Target, hdr.Source);
 				if (RXobj)
 					objectRXproceed(RXobj, &rxFIFO[rxFIFO_out]);
 			}
@@ -756,9 +756,9 @@ void LC_NetworkManager(uint32_t time) {
 		rxFIFO_out = (rxFIFO_out + 1) % LEVCAN_RX_SIZE;
 	}
 	//count work time and clean up
-	objBuffered* txProceed = (objBuffered*) objTXbuf_start;
+	objBuffered *txProceed = (objBuffered*) objTXbuf_start;
 	while (txProceed) {
-		objBuffered* next = (objBuffered*) txProceed->Next;
+		objBuffered *next = (objBuffered*) txProceed->Next;
 		txProceed->Time_since_comm += time;
 		if (txProceed->Flags.TCP == 0) {
 			//UDP mode send data continuously
@@ -787,9 +787,9 @@ void LC_NetworkManager(uint32_t time) {
 		txProceed = next;
 	}
 	//count work time and recall
-	objBuffered* rxProceed = (objBuffered*) objRXbuf_start;
+	objBuffered *rxProceed = (objBuffered*) objRXbuf_start;
 	while (rxProceed) {
-		objBuffered* next = (objBuffered*) rxProceed->Next;
+		objBuffered *next = (objBuffered*) rxProceed->Next;
 		rxProceed->Time_since_comm += time;
 		if (rxProceed->Time_since_comm > 500) {
 			//UDP mode rx timeout
@@ -831,7 +831,7 @@ void LC_NetworkManager(uint32_t time) {
 #endif
 }
 
-void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
+void deleteObject(objBuffered *obj, objBuffered **start, objBuffered **end) {
 	lc_disable_irq();
 	if (obj->Previous)
 		((objBuffered*) obj->Previous)->Next = obj->Next;    //junction
@@ -860,53 +860,53 @@ void deleteObject(objBuffered* obj, objBuffered** start, objBuffered** end) {
 	lc_enable_irq();
 	//free this object
 #ifdef LEVCAN_MEM_STATIC
-							releaseObject(obj);
-							#else
+	releaseObject(obj);
+#else
 	lcfree(obj);
 #endif
 }
 #ifdef LEVCAN_MEM_STATIC
-							objBuffered* getFreeObject(void) {
-							objBuffered* ret = 0;
-							//last free index
-							lc_disable_irq();
-							int freeid = objectBuffer_freeID;
-							if (freeid >= 0 && freeid < LEVCAN_OBJECT_SIZE) {
-							//search free
-							for (int i = freeid; i < LEVCAN_OBJECT_SIZE; i++) {
-							if (objectBuffer[i].Position == -1 && objectBuffer[i].Next == 0 && objectBuffer[i].Previous == 0) {
-							objectBuffer[i].Position = 0;
-							ret = &objectBuffer[i];
-							freeid = i + 1;    //next is possible free
-							break;
-							}
-							}
-							}
-							objectBuffer_freeID = freeid;
-							lc_enable_irq();
+objBuffered* getFreeObject(void) {
+	objBuffered *ret = 0;
+	//last free index
+	lc_disable_irq();
+	int freeid = objectBuffer_freeID;
+	if (freeid >= 0 && freeid < LEVCAN_OBJECT_SIZE) {
+		//search free
+		for (int i = freeid; i < LEVCAN_OBJECT_SIZE; i++) {
+			if (objectBuffer[i].Position == -1 && objectBuffer[i].Next == 0 && objectBuffer[i].Previous == 0) {
+				objectBuffer[i].Position = 0;
+				ret = &objectBuffer[i];
+				freeid = i + 1;    //next is possible free
+				break;
+			}
+		}
+	}
+	objectBuffer_freeID = freeid;
+	lc_enable_irq();
 
-							return ret;
-							}
+	return ret;
+}
 
-							void releaseObject(objBuffered* obj) {
-							lc_disable_irq();
-							int index = (obj - objectBuffer);
-							if (index >= 0 && index < LEVCAN_OBJECT_SIZE) {
-							//mark as free
-							objectBuffer[index].Position = -1;
-							objectBuffer[index].Next = 0;
-							objectBuffer[index].Previous = 0;
-							//save first free buffer in fast index
-							if (index < objectBuffer_freeID)
-							objectBuffer_freeID = index;
-							} else {
-							#ifdef LEVCAN_TRACE
+void releaseObject(objBuffered *obj) {
+	lc_disable_irq();
+	int index = (obj - objectBuffer);
+	if (index >= 0 && index < LEVCAN_OBJECT_SIZE) {
+		//mark as free
+		objectBuffer[index].Position = -1;
+		objectBuffer[index].Next = 0;
+		objectBuffer[index].Previous = 0;
+		//save first free buffer in fast index
+		if (index < objectBuffer_freeID)
+			objectBuffer_freeID = index;
+	} else {
+#ifdef LEVCAN_TRACE
 							trace_printf("Delete object error\n");
 							#endif
-							}
-							lc_enable_irq();
-							}
-							#endif
+	}
+	lc_enable_irq();
+}
+#endif
 
 headerPacked_t headerPack(LC_Header_t header) {
 	headerPacked_t hdr;
@@ -932,7 +932,7 @@ LC_Header_t headerUnpack(headerPacked_t header) {
 	return hdr;
 }
 
-void claimFreeID(LC_NodeDescription_t* node) {
+void claimFreeID(LC_NodeDescription_t *node) {
 	uint16_t freeid = LC_NodeFreeIDmin;
 	if (freeid < node->LastID) {
 		//this one will increment freeid
@@ -961,7 +961,7 @@ void claimFreeID(LC_NodeDescription_t* node) {
 
 }
 
-uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t* ownNode) {
+uint16_t searchIndexCollision(uint16_t nodeID, LC_NodeDescription_t *ownNode) {
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
 		//todo add online check?
 		if ((ownNode != &own_nodes[i]) && (own_nodes[i].ShortName.NodeID == nodeID) && (own_nodes[i].State != LCNodeState_Disabled))
@@ -1004,7 +1004,7 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 	return LC_Ok;
 }
 
-uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
+uint16_t objectTXproceed(objBuffered *object, headerPacked_t *request) {
 	int32_t length;
 	uint32_t data[2];
 	uint8_t parity = ~((object->Position + 7) / 8) & 1;    //parity
@@ -1095,7 +1095,7 @@ uint16_t objectTXproceed(objBuffered* object, headerPacked_t* request) {
 	return 0;
 }
 
-uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
+uint16_t objectRXproceed(objBuffered *object, msgBuffered *msg) {
 	if ((msg != 0) && (msg->header.RTS_CTS && object->Position != 0))
 		return 1; //position 0 can be started only with RTS (RTS will create new transfer object)
 
@@ -1118,20 +1118,20 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 			object->Pointer = newmem;
 			//todo check possible pointer loose and close object
 #else
-							//out of stack, inform and delete
-							#ifdef LEVCAN_TRACE
+			//out of stack, inform and delete
+#ifdef LEVCAN_TRACE
 							trace_printf("RX buffer overflow, object deleted:%d\n", object->Header.MsgID);
 							#endif
-							deleteObject(object, (objBuffered**) &objRXbuf_start, (objBuffered**) &objRXbuf_end);
-							return 0;
-							#endif
+			deleteObject(object, (objBuffered**) &objRXbuf_start, (objBuffered**) &objRXbuf_end);
+			return 0;
+#endif
 		}
 #ifndef LEVCAN_MEM_STATIC
 		if (object->Pointer)
 			memcpy(&object->Pointer[object->Position], msg->data, msg->length);
 #else
-							memcpy(&object->Data[object->Position], msg->data, msg->length);
-							#endif
+		memcpy(&object->Data[object->Position], msg->data, msg->length);
+#endif
 		object->Position = position_new;
 		parity = ~((object->Position + 7) / 8) & 1;    //update parity
 		object->Header.EoM = msg->header.EoM;
@@ -1170,8 +1170,8 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 #ifndef LEVCAN_MEM_STATIC
 		objectRXfinish(object->Header, object->Pointer, object->Position, 1);
 #else
-							objectRXfinish(object->Header, object->Data, object->Position, 0);
-							#endif
+		objectRXfinish(object->Header, object->Data, object->Position, 0);
+#endif
 		//delete object from memory chain, find new endings
 		deleteObject(object, (objBuffered**) &objRXbuf_start, (objBuffered**) &objRXbuf_end);
 	}
@@ -1179,9 +1179,9 @@ uint16_t objectRXproceed(objBuffered* object, msgBuffered* msg) {
 	return 0;
 }
 
-LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint8_t memfree) {
+LC_Return_t objectRXfinish(headerPacked_t header, char *data, int32_t size, uint8_t memfree) {
 	LC_Return_t ret = LC_Ok;
-	LC_NodeDescription_t* node = findNode(header.Target);
+	LC_NodeDescription_t *node = findNode(header.Target);
 	//check check and check again
 	LC_ObjectRecord_t obj = findObjectRecord(header.MsgID, size, node, Write, header.Source);
 	if (obj.Address != 0 && (obj.Attributes.Writable) != 0) {
@@ -1221,7 +1221,7 @@ LC_Return_t objectRXfinish(headerPacked_t header, char* data, int32_t size, uint
 }
 
 LC_NodeDescription_t* findNode(uint16_t nodeID) {
-	LC_NodeDescription_t* node = 0;
+	LC_NodeDescription_t *node = 0;
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++)
 		if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
 			node = &own_nodes[i];
@@ -1231,14 +1231,14 @@ LC_NodeDescription_t* findNode(uint16_t nodeID) {
 
 }
 
-LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t* node, uint8_t read_write, uint8_t nodeID) {
+LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescription_t *node, uint8_t read_write, uint8_t nodeID) {
 	LC_ObjectRecord_t rec = { 0 };
-	LC_ObjectRecord_t* record;
+	LC_ObjectRecord_t *record;
 	if (node == 0)
 		return rec;
 	for (int source = 0; source < 2; source++) {
 		int32_t objsize;
-		LC_Object_t* objectArray;
+		LC_Object_t *objectArray;
 		//switch between system objects and external
 		if (source) {
 			objsize = node->ObjectsSize;
@@ -1299,8 +1299,8 @@ LC_ObjectRecord_t findObjectRecord(uint16_t index, int32_t size, LC_NodeDescript
 /// @param target
 /// @param index
 /// @return
-LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t index) {
-	LC_NodeDescription_t* node = sender;
+LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t index) {
+	LC_NodeDescription_t *node = sender;
 	if (node == 0)
 		node = &own_nodes[0];
 	if (node->State != LCNodeState_Online)
@@ -1308,7 +1308,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t ind
 
 	if (object == 0)
 		return LC_ObjectError;
-	char* dataAddr = object->Address;
+	char *dataAddr = object->Address;
 	//check that data is real
 	if (dataAddr == 0 && object->Size != 0)
 		return LC_DataError;
@@ -1318,7 +1318,7 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t ind
 	//negative size means this is string - any length
 	if ((object->Attributes.TCP) || (object->Size > 8) || ((object->Size < 0) && (strnlen(dataAddr, 8) == 8))) {
 		//avoid dual same id
-		objBuffered* txProceed = findObject((void*) objTXbuf_start, index, object->NodeID, node->ShortName.NodeID);
+		objBuffered *txProceed = findObject((void*) objTXbuf_start, index, object->NodeID, node->ShortName.NodeID);
 		if (txProceed) {
 #ifdef DEBUG
 			lc_collision_cntr++;
@@ -1340,12 +1340,12 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t ind
 		objBuffered* newTXobj = (objBuffered*) lcmalloc(sizeof(objBuffered));
 
 #else
-							//no cleanup for static mem!
-							//todo make memcopy to data[] ?
-							if (object->Attributes.Cleanup == 1)
-							return LC_MallocFail;
-							objBuffered* newTXobj = getFreeObject();
-							#endif
+		//no cleanup for static mem!
+		//todo make memcopy to data[] ?
+		if (object->Attributes.Cleanup == 1)
+			return LC_MallocFail;
+		objBuffered *newTXobj = getFreeObject();
+#endif
 		if (newTXobj == 0)
 			return LC_MallocFail;
 		newTXobj->Attempt = 0;
@@ -1400,13 +1400,13 @@ LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t ind
 	return LC_Ok;
 }
 
-LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index) {
+LC_Return_t LC_SendRequest(void *sender, uint16_t target, uint16_t index) {
 	return LC_SendRequestSpec(sender, target, index, 0, 0);
 }
 
-LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP) {
+LC_Return_t LC_SendRequestSpec(void *sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP) {
 
-	LC_NodeDescription_t* node = sender;
+	LC_NodeDescription_t *node = sender;
 	if (node == 0)
 		node = &own_nodes[0];
 	if (node->State != LCNodeState_Online)
@@ -1481,7 +1481,7 @@ int16_t LC_GetNodeIndex(uint16_t nodeID) {
 /// Call this function in loop get all active nodes. Ends when returns LC_Broadcast_Address
 /// @param n Pointer to stored position for search
 /// @return Returns active node short name
-LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos) {
+LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos) {
 	int i = *last_pos;
 	//new run
 	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
@@ -1501,14 +1501,14 @@ LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos) {
 /// Returns own node short name, containing actual ID
 /// @param mynode pointer to node, can be 0 for default node
 /// @return LC_NodeShortName
-LC_NodeShortName_t LC_GetMyNodeName(void* mynode) {
-	LC_NodeDescription_t* node = mynode;
+LC_NodeShortName_t LC_GetMyNodeName(void *mynode) {
+	LC_NodeDescription_t *node = mynode;
 	if (node == 0)
 		node = &own_nodes[0];
 	return node->ShortName;
 }
 
-int16_t LC_GetMyNodeIndex(void* mynode) {
+int16_t LC_GetMyNodeIndex(void *mynode) {
 	if (mynode == 0)
 		return 0;
 	int16_t index = (own_nodes - (LC_NodeDescription_t*) mynode);
