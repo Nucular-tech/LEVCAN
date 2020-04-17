@@ -8,54 +8,65 @@
 #pragma once
 
 //user functions for critical sections
-static inline void lc_enable_irq(void)
-{
-  asm volatile ("cpsie i" : : : "memory");
+static inline void lc_enable_irq(void) {
+	asm volatile ("cpsie i" : : : "memory");
 }
-static inline void lc_disable_irq(void)
-{
+static inline void lc_disable_irq(void) {
 	asm volatile ("cpsid i" : : : "memory");
 }
-//FEATURES
-#define LEVCAN_FILECLIENT
-//#define LEVCAN_FILESERVER
-#define LEVCAN_PARAMETERS
-#define LEVCAN_EVENTS
 
+//Memory packing, compiler specific
+#define LEVCAN_PACKED __attribute__((packed))
+
+#ifdef TRACE
 //Print debug messages using trace_printf
 //#define LEVCAN_TRACE
 //You can re-define trace_printf function
 //#define trace_printf printf
-//Float-point support
-//#define LEVCAN_USE_FLOAT
-//Memory packing, compiler specific, used to decrease the data type alignment to 1-byte
-#if defined (__CC_ARM)         /* ARM Compiler */
-  #define LEVCAN_PACKED    __packed
-#elif defined (__ICCARM__)     /* IAR Compiler */
-  #define LEVCAN_PACKED    __packed
-#elif defined   ( __GNUC__ )   /* GNU Compiler */                        
-  #define LEVCAN_PACKED    __attribute__((__packed__))
-#endif /* __CC_ARM */
-//Max device created nodes
-#define LEVCAN_MAX_OWN_NODES 2
-//Network node table
+#endif
+
+//define to use simple file io operations
+#define LEVCAN_FILECLIENT
+//define to use buffered printf
+#define LEVCAN_BUFFER_FILEPRINTF
+//File operations timeout for client side (ms)
+#define LEVCAN_FILE_TIMEOUT 500
+
+//define to be able to configure your device over levcan
+#define LEVCAN_PARAMETERS
+//define to be able print and parse your parameters
+#define LEVCAN_PARAMETERS_PARSING
+//Float-point support for parameters
+#define LEVCAN_USE_FLOAT
+//parameters receive buffer size
+#define LEVCAN_PARAM_QUEUE_SIZE 5
+
+//defiene to use small messages pop-ups on display
+#define LEVCAN_EVENTS
+
+//Max own created nodes
+#define LEVCAN_MAX_OWN_NODES 1
+
+//max saved nodes short names (used for search)
 #define LEVCAN_MAX_TABLE_NODES 10
+
 //Above-driver buffer size. Used to store CAN messages before calling network manager
-//Make shure that you cannot receive more messages before LC_NetworkManager update
 #define LEVCAN_TX_SIZE 20
 #define LEVCAN_RX_SIZE 30
-//enable parameters and setup receive buffer size
-#define LEVCAN_PARAM_QUEUE_SIZE 5
-//Default size for malloc, maximum size for static mem. Minimum - 8byte
-#define LEVCAN_OBJECT_DATASIZE 48
+
+//Default size for malloc, maximum size for static mem, data size for file i/o
+#define LEVCAN_OBJECT_DATASIZE 64
+#define LEVCAN_FILE_DATASIZE 512
+
 //Enable this to use only static memory
-#define LEVCAN_MEM_STATIC
+//#define LEVCAN_MEM_STATIC
 
 #ifdef LEVCAN_MEM_STATIC
-//Maximum TX/RX objects. Excl. UDP data <=8byte, this receives in fast mode
-#define LEVCAN_OBJECT_SIZE 10
+//Maximum TX/RX objects at one time. Excl. UDP data <=8byte, this receives in fast mode
+#define LEVCAN_OBJECT_SIZE 20
 #else
 //external malloc functions
 #define lcmalloc pvPortMalloc
 #define lcfree vPortFree
+#define lcdelay vTaskDelay
 #endif
