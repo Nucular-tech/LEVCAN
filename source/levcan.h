@@ -130,14 +130,14 @@ typedef struct {
 	LC_Object_t SystemObjects[LC_SYS_End - LC_SYS_NodeName];
 	void* Directories;
 	uint16_t DirectoriesSize;
-} LC_NodeDescription_t;
+} LC_NodeDescriptor_t;
 
 typedef struct {
 	LC_NodeShortName_t ShortName;
 	uint32_t LastRXtime;
 } LC_NodeTable_t;
 
-typedef void (*LC_FunctionCall_t)(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size);
+typedef void (*LC_FunctionCall_t)(LC_NodeDescriptor_t* node, LC_Header_t header, void* data, int32_t size);
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
@@ -159,16 +159,23 @@ enum {
 	LC_RX, LC_TX, LC_NodeFreeIDmin = 64, LC_NodeFreeIDmax = 125
 };
 
-uintptr_t* LC_CreateNode(LC_NodeInit_t node);
-void LC_AddressClaimHandler(LC_NodeShortName_t node, uint16_t mode);
+LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node);
+//Handlers should be called from CAN HAL ISR
 void LC_ReceiveHandler(void);
-void LC_NetworkManager(uint32_t time);
+void LC_TransmitHandler(void);
+
+//Managers should be called from separate tasks, if LEVCAN_USE_RTOS_QUEUE set
+void LC_NetworkManager(uint32_t time); //low priority
+void LC_ReceiveManager(void); //high priority
+void LC_TransmitManager(void); //high priority
+
 LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t index);
 LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 LC_Return_t LC_SendDiscoveryRequest(uint16_t target);
-void LC_TransmitHandler(void);
+
 LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos);
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
 LC_NodeShortName_t LC_GetMyNodeName(void* mynode);
 int16_t LC_GetMyNodeIndex(void* mynode);
+

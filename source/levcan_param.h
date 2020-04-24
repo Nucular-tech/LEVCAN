@@ -120,10 +120,10 @@ LC_Return_t LC_ParameterUpdateAsync(LC_ParameterValue_t *paramv, uint16_t dir, v
 void LC_ParametersStopUpdating(void);
 int32_t LC_GetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index);
 int LC_SetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index, int32_t value);
-const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t *node, int16_t dir, int16_t index);
+const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescriptor_t *node, int16_t dir, int16_t index);
 //misc functions
-const char* LC_ParseParameterLine(LC_NodeDescription_t *node, const char *input, int16_t *directory, int16_t *index, int32_t *value);
+const char* LC_ParseParameterLine(LC_NodeDescriptor_t *node, const char *input, int16_t *directory, int16_t *index, int32_t *value);
 void LC_PrintParam(char *buffer, const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index);
 int LC_GetParameterValueFromStr(const LC_ParameterAdress_t *parameter, const char *string, int32_t *value);
-int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s);
-int16_t LC_IsParameter(LC_NodeDescription_t *node, const char *s, uint8_t directory);
+int16_t LC_IsDirectory(LC_NodeDescriptor_t *node, const char *s);
+int16_t LC_IsParameter(LC_NodeDescriptor_t *node, const char *s, uint8_t directory);

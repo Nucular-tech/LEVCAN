@@ -16,8 +16,6 @@
 #include "levcan_filedef.h"
 
 #if	defined(lcmalloc) && defined(lcfree)
-extern void *lcmalloc(uint32_t size);
-extern void lcfree(void *pointer);
 #else
 #error "You should define lcmalloc, lcfree for levcan_fileserver.c!"
 #endif

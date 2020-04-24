@@ -36,7 +36,7 @@ char lc_printf_buffer[LEVCAN_FILE_DATASIZE - sizeof(fOpData_t)];
 uint32_t lc_printf_size = 0;
 #endif
 
-void proceedFileClient(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size) {
+void proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
 	(void) header; //no warnings
 
 	if (size < 2)

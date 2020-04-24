@@ -14,9 +14,6 @@
 #include <math.h>
 #include <ctype.h>
 
-extern void* lcmalloc(uint32_t xWantedSize);
-extern void lcfree(void *pv);
-
 typedef struct {
 	int32_t Value;
 	int32_t Min;
@@ -54,7 +51,7 @@ typedef struct {
 } bufferedParam_t;
 
 //### Local functions ###
-void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size);
+void lc_proceedParam(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 const char* extractName(const LC_ParameterDirectory_t directories[], uint16_t directory, uint16_t index);
 uint16_t check_align(const LC_ParameterAdress_t *parameter);
 bufferedParam_t* findReceiver(int16_t dir, int16_t index, int16_t source);
@@ -222,7 +219,7 @@ int LC_SetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t d
 	return 0;
 }
 
-void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data, int32_t size) {
+void lc_proceedParam(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
 	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = {0};
 #endif
@@ -438,7 +435,7 @@ void lc_proceedParam(LC_NodeDescription_t *node, LC_Header_t header, void *data,
 
 /// Returns and prints local parameters information
 LC_ParameterTableSize_t LC_ParamInfo_Size(void *vnode) {
-	LC_NodeDescription_t *node = vnode;
+	LC_NodeDescriptor_t *node = vnode;
 	int32_t size = 0;
 	int32_t textsize = 0;
 	int32_t parameters = 0;
@@ -558,7 +555,7 @@ void proceed_RX(void) {
 	}
 }
 
-const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescription_t *node, int16_t dir, int16_t index) {
+const LC_ParameterAdress_t* LC_GetParameterAdress(const LC_NodeDescriptor_t *node, int16_t dir, int16_t index) {
 	//array correctly filled?
 	if (index >= 0 && dir >= 0 && dir < node->DirectoriesSize) {
 		LC_ParameterDirectory_t *directory = &(((LC_ParameterDirectory_t*) node->Directories)[dir]);
@@ -736,7 +733,7 @@ int LC_GetParameterValueFromStr(const LC_ParameterAdress_t *parameter, const cha
 	return 1;
 }
 
-int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s) {
+int16_t LC_IsDirectory(LC_NodeDescriptor_t *node, const char *s) {
 	//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "]#=\n\r");
 	//remove space ending
@@ -751,7 +748,7 @@ int16_t LC_IsDirectory(LC_NodeDescription_t *node, const char *s) {
 	return -1;
 }
 
-int16_t LC_IsParameter(LC_NodeDescription_t *node, const char *s, uint8_t directory) {
+int16_t LC_IsParameter(LC_NodeDescriptor_t *node, const char *s, uint8_t directory) {
 	//index [0] is directory entry, dont scan
 	int searchlen = strcspn(s, "#=\n\r");
 	//remove space ending
@@ -770,7 +767,7 @@ int16_t LC_IsParameter(LC_NodeDescription_t *node, const char *s, uint8_t direct
 
 #ifdef LEVCAN_TRACE
 void LC_ParametersPrintAll(void* vnode) {
-	LC_NodeDescription_t* node = vnode;
+	LC_NodeDescriptor_t* node = vnode;
 	char buffer[128];
 	trace_printf("# %s\n", node->DeviceName);
 	trace_printf("# Network ID: %d\n", node->ShortName.NodeID);
@@ -794,7 +791,7 @@ void LC_ParametersPrintAll(void* vnode) {
 /// @param directory
 /// @param index
 /// @return
-const char* LC_ParseParameterLine(LC_NodeDescription_t *node, const char *input, int16_t *directory, int16_t *index, int32_t *value) {
+const char* LC_ParseParameterLine(LC_NodeDescriptor_t *node, const char *input, int16_t *directory, int16_t *index, int32_t *value) {
 	if (index == 0 || directory == 0 || value == 0 || input == 0 || node == 0)
 		return 0;
 	int16_t dir = *directory;

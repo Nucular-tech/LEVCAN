@@ -21,10 +21,6 @@ typedef struct {
 	char Text[];
 } eventSend_t;
 
-#ifndef LEVCAN_MEM_STATIC
-extern void *lcmalloc(uint32_t xWantedSize);
-extern void lcfree(void *pv);
-#endif
 
 volatile uint8_t lc_eventButtonPressed = LC_EB_None;
 char lc_event_buffer[LC_EVENT_SIZE];
