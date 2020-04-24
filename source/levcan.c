@@ -8,10 +8,10 @@
 
 #include "levcan.h"
 #include "levcan_param.h"
+#include LEVCAN_HAL
 
 #include "string.h"
 #include "stdlib.h"
-#include "can_hal.h"
 
 #if	defined(lcmalloc) && defined(lcfree)
 extern void *lcmalloc(uint32_t size);

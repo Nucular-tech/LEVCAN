@@ -5,6 +5,7 @@
 
 typedef enum {
 	LC_Device_Unknown = 0,
+	LC_Device_reserved = 0x1,
 	LC_Device_BMS = 0x2,
 	LC_Device_Controller = 0x4,
 	LC_Device_Display = 0x8,
@@ -12,6 +13,8 @@ typedef enum {
 	LC_Device_RemoteControl = 0x20,
 	LC_Device_Misc = 0x40,
 	LC_Device_Debug = 0x80,
+	LC_Device_reserved2 = 0x100,
+	LC_Device_reserved3 = 0x200,
 } LC_Device_t;
 
 typedef enum {
