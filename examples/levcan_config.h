@@ -24,6 +24,8 @@ static inline void lc_disable_irq(void) {
 //You can re-define trace_printf function
 //#define trace_printf printf
 #endif
+//your hal driver file
+#define LEVCAN_HAL "can_hal.h"
 
 //define to use simple file io operations
 #define LEVCAN_FILECLIENT
