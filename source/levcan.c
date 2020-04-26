@@ -106,9 +106,9 @@ volatile objBuffered *objRXbuf_start = 0;
 volatile objBuffered *objRXbuf_end = 0;
 volatile uint16_t own_node_count;
 #ifdef DEBUG
-					volatile uint32_t lc_collision_cntr = 0;
-					volatile uint32_t lc_receive_ovfl_cntr = 0;
-					#endif
+volatile uint32_t lc_collision_cntr = 0;
+volatile uint32_t lc_receive_ovfl_cntr = 0;
+#endif
 //#### PRIVATE FUNCTIONS ####
 void initialize(void);
 void configureFilters(void);
@@ -148,12 +148,16 @@ extern void __attribute__((weak, alias("lc_default_handler")))
 lc_proceedParam(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 #endif
 #ifdef LEVCAN_FILESERVER
-												extern void __attribute__((weak, alias("lc_default_handler")))
-												proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data, int32_t size);
-												#endif
+extern void __attribute__((weak, alias("lc_default_handler")))
+proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data, int32_t size);
+#endif
 #ifdef LEVCAN_FILECLIENT
+#ifdef LEVCAN_USE_RTOS_QUEUE
+extern void *frxQueue[];
+#else
 extern void __attribute__((weak, alias("lc_default_handler")))
 proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
+#endif
 #endif
 //#### FUNCTIONS
 const LC_Object_t prclaim = { .Address = proceedAddressClaim, .Attributes.Readable = 1, .Attributes.Writable = 1, .Attributes.Function = 1, .Index =
@@ -187,7 +191,7 @@ LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node) {
 	}
 	if (i == LEVCAN_MAX_OWN_NODES)
 		return 0; //out of range
-
+	int node_table_index = i;
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	txQueue = LC_QueueCreate(LEVCAN_TX_SIZE, sizeof(msgBuffered));
 	rxQueue = LC_QueueCreate(LEVCAN_RX_SIZE, sizeof(msgBuffered));
@@ -273,7 +277,6 @@ LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node) {
 	objparam->Index = LC_SYS_Events;
 	objparam->Size = sizeof(lc_eventButtonPressed);
 #endif
-	//todo add server also?!
 #ifdef LEVCAN_PARAMETERS
 	if (newnode->ShortName.Configurable && lc_proceedParam != lc_default_handler) {
 		//parameter editor
@@ -287,18 +290,28 @@ LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node) {
 	}
 #endif
 #ifdef LEVCAN_FILESERVER
-												if (node.FileServer && proceedFileServer != lc_default_handler) {
-												//File server
-												objparam = &newnode->SystemObjects[sysinx++];
-												objparam->Address = proceedFileServer;
-												objparam->Attributes.Writable = 1;
-												objparam->Attributes.Function = 1;
-												objparam->Attributes.TCP = 1;
-												objparam->Index = LC_SYS_FileClient;//get client requests
-												objparam->Size = -1;//anysize
-												}
-												#endif
+	if (node.FileServer && proceedFileServer != lc_default_handler) {
+		//File server
+		objparam = &newnode->SystemObjects[sysinx++];
+		objparam->Address = proceedFileServer;
+		objparam->Attributes.Writable = 1;
+		objparam->Attributes.Function = 1;
+		objparam->Attributes.TCP = 1;
+		objparam->Index = LC_SYS_FileClient;//get client requests
+		objparam->Size = -1;//anysize
+	}
+#endif
 #ifdef LEVCAN_FILECLIENT
+#ifdef LEVCAN_USE_RTOS_QUEUE
+	//File client
+	objparam = &newnode->SystemObjects[sysinx++];
+	frxQueue[node_table_index] = objparam->Address = LC_QueueCreate(LEVCAN_MAX_OWN_NODES, sizeof(LC_ObjectData_t));
+	objparam->Attributes.Writable = 1;
+	objparam->Attributes.Queue = 1;
+	objparam->Attributes.TCP = 1;
+	objparam->Index = LC_SYS_FileServer;      //get client requests
+	objparam->Size = -1;      //anysize
+#else
 	if (proceedFileClient != lc_default_handler) {
 		//File client
 		objparam = &newnode->SystemObjects[sysinx++];
@@ -309,6 +322,7 @@ LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node) {
 		objparam->Index = LC_SYS_FileServer;      //get client requests
 		objparam->Size = -1;      //anysize
 	}
+#endif
 #endif
 	//begin network discovery for start
 	newnode->LastTXtime = 0;
@@ -945,7 +959,7 @@ LC_Return_t sendDataToQueue(headerPacked_t hdr, uint32_t data[], uint8_t length)
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	//todo queue may return fault
 	LC_QueueSendToBack(txQueue, &msgTX, 1);
-	LC_SemaphoreGive(txSemph);
+	//LC_SemaphoreGive(txSemph);
 #else
 	txFIFO[txFIFO_in] = msgTX;
 	txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
@@ -1151,6 +1165,27 @@ LC_Return_t objectRXfinish(headerPacked_t header, char *data, int32_t size, uint
 			if (clean)
 				lcfree(clean);
 			memfree = 0;
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		} else if (obj.Attributes.Queue) {
+
+			if (memfree == 0) {
+				//that means it uses static memory.
+				char *allocated_mem = lcmalloc(size);
+				if (allocated_mem) {
+					memcpy(allocated_mem, data, size);
+					data = allocated_mem;
+				} else
+					return LC_MallocFail;
+
+			}
+			LC_ObjectData_t qdata;
+			qdata.Data = (intptr_t*)data; //user code should call mem free
+			qdata.Header = headerUnpack(header);
+			qdata.Size = size;
+			//queue stores LC_ObjectData_t that includes pointer to data
+			if (LC_QueueSendToBack(obj.Address, &qdata, 0))
+				memfree = 0; //queued successfully
+#endif
 #endif
 		} else {
 			//just copy data as usual to specific location
@@ -1167,7 +1202,7 @@ LC_Return_t objectRXfinish(headerPacked_t header, char *data, int32_t size, uint
 		trace_printf("RX finish failed %d no object found for size %d\n", header.MsgID, size);
 #endif
 	}
-	//cleanup
+//cleanup
 	if (memfree)
 		lcfree(data);
 	return ret;
@@ -1267,13 +1302,13 @@ LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t ind
 	if (object == 0)
 		return LC_ObjectError;
 	char *dataAddr = object->Address;
-	//check that data is real
+//check that data is real
 	if (dataAddr == 0 && object->Size != 0)
 		return LC_DataError;
-	//extract pointer
+//extract pointer
 	if (object->Attributes.Pointer)
 		dataAddr = *(char**) dataAddr;
-	//negative size means this is string - any length
+//negative size means this is string - any length
 	if ((object->Attributes.TCP) || (object->Size > 8) || ((object->Size < 0) && (strnlen(dataAddr, 8) == 8))) {
 		//avoid dual same id
 		objBuffered *txProceed = findObject((void*) objTXbuf_start, index, object->NodeID, node->ShortName.NodeID);
@@ -1508,16 +1543,21 @@ void LC_ReceiveManager(void) {
 }
 
 void LC_TransmitManager(void) {
-	//fill TX buffer till no empty slots
-	//Some thread safeness
+//fill TX buffer till no empty slots
+//Some thread safeness
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	msgBuffered msgTX;
 
-	LC_SemaphoreTake(txSemph, 10);
-	while (LC_QueueReceive(txQueue, &msgTX, 10)) {
+//look for new messages
+	while (LC_QueueReceive(txQueue, &msgTX, 100)) {
+		//clear TX semaphore, maybe there is a lot of time passed alrdy
+		LC_SemaphoreTake(txSemph, 0);
+		//try to send data
 		if (CAN_Send(msgTX.header.ToUint32, msgTX.data, msgTX.length) != 0) {
-			LC_QueueSendToFront(txQueue, &msgTX, 1);
-			break; //CAN full
+			//send failed, TX full, need to wait
+			LC_QueueSendToFront(txQueue, &msgTX, 1); //store item back
+			//wait for CAN TX to be empty
+			LC_SemaphoreTake(txSemph, 100);
 		}
 	}
 #else
@@ -1549,7 +1589,7 @@ void LC_TransmitHandler(void) {
 
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID) {
 	int i = 0;
-	//search
+//search
 	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID == nodeID) {
 			return node_table[i].ShortName;
@@ -1562,7 +1602,7 @@ LC_NodeShortName_t LC_GetNode(uint16_t nodeID) {
 int16_t LC_GetNodeIndex(uint16_t nodeID) {
 	if (nodeID >= LC_Null_Address)
 		return -1;
-	//search
+//search
 	for (int16_t i = 0; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID == nodeID) {
 			return i;
@@ -1575,10 +1615,10 @@ int16_t LC_GetNodeIndex(uint16_t nodeID) {
 /// @return Returns active node short name
 LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos) {
 	int i = *last_pos;
-	//new run
+//new run
 	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
 		i = 0;
-	//search
+//search
 	for (; i < LEVCAN_MAX_TABLE_NODES; i++) {
 		if (node_table[i].ShortName.NodeID != LC_Broadcast_Address) {
 			*last_pos = i + 1;

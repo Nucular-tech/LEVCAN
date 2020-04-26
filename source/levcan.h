@@ -22,6 +22,9 @@ typedef union {
 		//received data will be saved as pointer to memory area, if there is already exists, it will be free
 		unsigned Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
 		unsigned Cleanup :1;	//after transmission pointer will call memfree
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		unsigned Queue :1;		//will place data on specified queue (address should have queue pointer)
+#endif
 	}LEVCAN_PACKED;
 } LC_ObjectAttributes_t;
 
@@ -33,10 +36,10 @@ typedef struct {
 } LC_Object_t;
 
 typedef struct {
-	int16_t Size;
+	uint8_t NodeID; //filters specified sender ID
 	LC_ObjectAttributes_t Attributes;
+	int32_t Size;
 	void* Address; //pointer to memory data. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
-	uint8_t NodeID;
 } LC_ObjectRecord_t;
 
 typedef struct {
@@ -51,6 +54,12 @@ typedef struct {
 		unsigned Priority :2;
 	};
 } LC_Header_t;
+
+typedef struct {
+	LC_Header_t Header;
+	int32_t Size;
+	intptr_t* Data;
+} LC_ObjectData_t;
 
 typedef struct {
 	union {

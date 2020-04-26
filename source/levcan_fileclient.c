@@ -25,17 +25,24 @@
 //extern functions
 extern void* lcdelay(uint32_t time);
 //private functions
-LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node, int16_t *retid);
+LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node, int16_t *idOut, fOpAck_t *askOut);
+void processReceivedData(int id, fOpData_t *opdata, int32_t rsize);
 //private variables
 volatile fRead_t rxtoread[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile uint32_t fpos[LEVCAN_MAX_OWN_NODES] = { 0 };
 volatile uint8_t fnode[LEVCAN_MAX_OWN_NODES] = { [0 ... (LEVCAN_MAX_OWN_NODES - 1)] = LC_Broadcast_Address };
+
+#ifdef LEVCAN_USE_RTOS_QUEUE
+void *frxQueue[LEVCAN_MAX_OWN_NODES];
+#else
 volatile fOpAck_t rxack[LEVCAN_MAX_OWN_NODES] = { 0 };
+#endif
 #ifdef LEVCAN_BUFFER_FILEPRINTF
 char lc_printf_buffer[LEVCAN_FILE_DATASIZE - sizeof(fOpData_t)];
 uint32_t lc_printf_size = 0;
 #endif
 
+#ifndef LEVCAN_USE_RTOS_QUEUE
 void proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
 	(void) header; //no warnings
 
@@ -60,23 +67,13 @@ void proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data
 		int id = LC_GetMyNodeIndex(node);
 		//check if it is okay
 		if (id >= 0) {
-			if (rxtoread[id].Buffer != 0 && fop->TotalBytes <= rxtoread[id].ReadBytes && rxtoread[id].Position == UINT32_MAX
-					&& size == (int32_t) (fop->TotalBytes + sizeof(fOpData_t))) {
-				memcpy(rxtoread[id].Buffer, fop->Data, fop->TotalBytes);
-				rxtoread[id].ReadBytes = fop->TotalBytes;
-				rxtoread[id].Error = fop->Error;
-				rxtoread[id].Position = fop->Position; //trigger
-			} else {
-				rxtoread[id].Error = LC_FR_NetworkError; //data error
-				rxtoread[id].ReadBytes = 0;
-				rxtoread[id].Position = 0;
-			}
+			processReceivedData(id, fop, size);
 		}
 	}
 		break;
 	}
 }
-
+#endif
 /// Open/Create a file
 /// @param name File name
 /// @param mode Mode flags LC_FileAccess_t
@@ -103,7 +100,7 @@ LC_FileResult_t LC_FileOpen(char *name, LC_FileAccess_t mode, void *sender_node,
 	strcpy(&openf->Name[0], name);
 	openf->Mode = mode;
 	int16_t reid;
-	LC_FileResult_t ret = lc_client_sendwait(openf, datasize, sender_node, &reid);
+	LC_FileResult_t ret = lc_client_sendwait(openf, datasize, sender_node, &reid, 0);
 	if (ret != LC_FR_Ok)
 		fnode[id] = LC_Broadcast_Address; //reset server
 	else
@@ -167,6 +164,9 @@ LC_FileResult_t LC_FileRead(char *buffer, uint32_t btr, uint32_t *br, void *send
 		readf.ToBeRead = toreadnow;
 		readf.Position = globalpos; //add global position
 
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		LC_QueueReset(frxQueue[id]);
+#endif
 		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
 		//send error?
 		if (sr) {
@@ -178,12 +178,24 @@ LC_FileResult_t LC_FileRead(char *buffer, uint32_t btr, uint32_t *br, void *send
 				ret = LC_FR_NetworkError;
 			break;
 		}
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		LC_ObjectData_t obj_data = { 0 };
+		//wait for receive
+		if (LC_QueueReceive(frxQueue[id], &obj_data, LEVCAN_FILE_TIMEOUT)) {
+			fOpData_t *op_data = (fOpData_t*) obj_data.Data;
+			if (op_data->Operation == fOpData) {
+				processReceivedData(id, op_data, obj_data.Size);
+				lcfree(obj_data.Data);
+			}
+		}
+#else
 		//wait 500ms
 		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
 			lcdelay(1);
 			if (rxtoread[id].Position != UINT32_MAX)
 				break;
 		}
+#endif
 		//just make some checks
 		if (rxtoread[id].Position != UINT32_MAX && rxtoread[id].Position == globalpos && rxtoread[id].ReadBytes <= toreadnow) {
 			//received something, data already filled, move pointers
@@ -210,6 +222,20 @@ LC_FileResult_t LC_FileRead(char *buffer, uint32_t btr, uint32_t *br, void *send
 	fpos[id] += *br;
 	rxtoread[id].Buffer = 0;
 	return ret;
+}
+
+void processReceivedData(int id, fOpData_t *opdata, int32_t rsize) {
+	if (rxtoread[id].Buffer != 0 && opdata->TotalBytes <= rxtoread[id].ReadBytes && rxtoread[id].Position == UINT32_MAX
+			&& rsize == (int32_t) (opdata->TotalBytes + sizeof(fOpData_t))) {
+		memcpy(rxtoread[id].Buffer, opdata->Data, opdata->TotalBytes);
+		rxtoread[id].ReadBytes = opdata->TotalBytes;
+		rxtoread[id].Error = opdata->Error;
+		rxtoread[id].Position = opdata->Position; //trigger
+	} else {
+		rxtoread[id].Error = LC_FR_NetworkError; //data error
+		rxtoread[id].ReadBytes = 0;
+		rxtoread[id].Position = 0;
+	}
 }
 
 /// Writes data to a file.
@@ -249,14 +275,15 @@ LC_FileResult_t LC_FileWrite(const char *buffer, uint32_t btw, uint32_t *bw, voi
 		writef->TotalBytes = towritenow;
 		memcpy(&writef->Data[0], &buffer[position], towritenow);
 		//setup packet size
-		ret = lc_client_sendwait(writef, sizeof(fOpData_t) + towritenow, sender_node, &reid);
+		fOpAck_t ask_result = { 0 };
+		ret = lc_client_sendwait(writef, sizeof(fOpData_t) + towritenow, sender_node, &reid, &ask_result);
 
-		if (reid >= 0 && rxack[reid].Operation == fOpAck) {
+		if (reid >= 0 && ask_result.Operation == fOpAck) {
 			//rxtoread[id].Position is bytes written
-			position += rxack[reid].Position;
-			*bw += rxack[reid].Position;
+			position += ask_result.Position;
+			*bw += ask_result.Position;
 			attempt = 0;
-			if (rxack[reid].Position < towritenow)
+			if (ask_result.Position < towritenow)
 				break; //not all written
 		} else {
 			attempt++;
@@ -344,9 +371,11 @@ LC_FileResult_t LC_FileLseek(uint32_t position, void *sender_node) {
 	fOpLseek_t lseekf;
 	lseekf.Operation = fOpLseek;
 	lseekf.Position = position;
-	LC_FileResult_t result = lc_client_sendwait(&lseekf, sizeof(fOpLseek_t), sender_node, &reid);
-	if (reid >= 0 && rxack[reid].Operation == fOpAck)
-		fpos[reid] = rxack[reid].Position; //update position
+
+	fOpAck_t ask_result = { 0 };
+	LC_FileResult_t result = lc_client_sendwait(&lseekf, sizeof(fOpLseek_t), sender_node, &reid, &ask_result);
+	if (reid >= 0 && ask_result.Operation == fOpAck)
+		fpos[reid] = ask_result.Position; //update position
 	return result;
 }
 
@@ -369,9 +398,12 @@ uint32_t LC_FileSize(void *sender_node) {
 	//create buffer
 	fOpOperation_t closef;
 	closef.Operation = fOpAckSize;
-	lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
-	if (reid >= 0 && rxack[reid].Operation == fOpAck)
-		return rxack[reid].Position; //file size
+
+	fOpAck_t ask_result = { 0 };
+	lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid, &ask_result);
+
+	if (reid >= 0 && ask_result.Operation == fOpAck)
+		return ask_result.Position; //file size
 	return 0;
 }
 
@@ -383,7 +415,7 @@ LC_FileResult_t LC_FileTruncate(void *sender_node) {
 	//create buffer
 	fOpOperation_t closef;
 	closef.Operation = fOpTruncate;
-	return lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
+	return lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid, 0);
 }
 
 /// Close an open file
@@ -414,7 +446,7 @@ LC_FileResult_t LC_FileClose(void *sender_node, uint8_t server_node) {
 	//create buffer
 	fOpOperation_t closef;
 	closef.Operation = fOpClose;
-	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid);
+	LC_FileResult_t result = lc_client_sendwait(&closef, sizeof(fOpOperation_t), sender_node, &reid, 0);
 	//reset server
 	fnode[id] = LC_Broadcast_Address;
 	return result;
@@ -458,14 +490,20 @@ LC_NodeShortName_t LC_FindFileServer(uint16_t *scnt) {
 	return node;
 }
 
-LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node, int16_t *retid) {
+LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node, int16_t *idOut, fOpAck_t *askOut) {
 	LC_NodeShortName_t server;
 	int id = LC_GetMyNodeIndex(sender_node);
-	*retid = id;
-	if (id < 0)
+	*idOut = id;
+	if (id < 0
+#ifdef LEVCAN_USE_RTOS_QUEUE
+			|| frxQueue[id] == 0
+#endif
+			)
 		return LC_FR_NodeOffline;
 	//reset ACK
+#ifndef LEVCAN_USE_RTOS_QUEUE
 	rxack[id] = (fOpAck_t ) { 0 };
+#endif
 	//look for any server node
 	if (fnode[id] == LC_Broadcast_Address)
 		return LC_FR_FileNotOpened;
@@ -483,6 +521,9 @@ LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node,
 	rec.NodeID = server.NodeID;
 	uint16_t attempt = 0;
 	for (attempt = 0; attempt < 3; attempt++) {
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		LC_QueueReset(frxQueue[id]);
+#endif
 		LC_Return_t sr = LC_SendMessage(sender_node, &rec, LC_SYS_FileClient);
 		//send error?
 		if (sr) {
@@ -493,11 +534,32 @@ LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node,
 			return LC_FR_NetworkError;
 		}
 		//wait
+#ifdef LEVCAN_USE_RTOS_QUEUE
+		LC_ObjectData_t ack_data = { 0 };
+		//wait for receive
+		if (LC_QueueReceive(frxQueue[id], &ack_data, LEVCAN_FILE_TIMEOUT)) {
+			if (sizeof(fOpAck_t) == ack_data.Size) {
+				//convert data to ack type
+				fOpAck_t ack = *((fOpAck_t*) ack_data.Data);
+				if (ack.Operation == fOpAck) {
+					if (askOut)
+						*askOut = ack;
+					lcfree(ack_data.Data);
+					return ack.Error; //Finish!
+				}
+			}
+			lcfree(ack_data.Data);
+		}
+#else
 		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
 			lcdelay(1);
-			if (rxack[id].Operation == fOpAck)
+			if (rxack[id].Operation == fOpAck) {
+				if (askOut)
+					*askOut = rxack[id];
 				return rxack[id].Error; //Finish!
+			}
 		}
+#endif
 	}
 
 	return LC_FR_NetworkTimeout;
