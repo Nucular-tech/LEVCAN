@@ -55,6 +55,24 @@ typedef struct {
 	};
 } LC_Header_t;
 
+typedef union {
+	uint32_t ToUint32;
+	struct {
+		//can specific:
+		unsigned reserved1 :1;
+		unsigned Request :1;
+		unsigned IDE :1;    //29b=1
+		//index 29bit:
+		unsigned Source :7;
+		unsigned Target :7;
+		unsigned MsgID :10;
+		unsigned EoM :1;
+		unsigned Parity :1;
+		unsigned RTS_CTS :1;
+		unsigned Priority :2;
+	} LEVCAN_PACKED;
+} LC_HeaderPacked_t;
+
 typedef struct {
 	LC_Header_t Header;
 	int32_t Size;
@@ -70,7 +88,8 @@ typedef struct {
 			unsigned SWUpdates :1;
 			unsigned Events :1;
 			unsigned FileServer :1;
-			unsigned reserved :(64 - 5 - 32);
+			unsigned reserved :(64 - 6 - 32);
+			unsigned DynamicID :1;
 			unsigned DeviceType :10;
 			unsigned ManufacturerCode :10;
 			unsigned SerialNumber :12;
@@ -181,10 +200,11 @@ void LC_TransmitManager(void); //high priority
 LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t index);
 LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
 LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
-LC_Return_t LC_SendDiscoveryRequest(uint16_t target);
 
 LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos);
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
 LC_NodeShortName_t LC_GetMyNodeName(void* mynode);
 int16_t LC_GetMyNodeIndex(void* mynode);
 
+LC_HeaderPacked_t LC_HeaderPack(LC_Header_t header);
+LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header);
