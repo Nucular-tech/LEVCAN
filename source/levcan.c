@@ -135,6 +135,7 @@ proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int
 #endif
 #endif
 extern void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
+extern LC_Return_t lc_sendDiscoveryRequest(uint16_t target);
 //#### FUNCTIONS
 
 LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node) {
