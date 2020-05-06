@@ -1,5 +1,10 @@
+/*
+ * CAN driver library for STM32 by V.Sukhoparov aka VasiliSk
+ * MIT License
+ */  
 #include <string.h>
 #include <math.h>
+#include "levcan.h"
 
 #ifdef  STM32F10X_MD
 #include "stm32f10x.h"
@@ -205,7 +210,7 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 			//already active
 			relative = 0;
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank)) == (reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == (fifo << filter_bank))
+			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t)reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t)fifo << filter_bank))
 					&& ((CAN1->FM1R & (1 << filter_bank)) != 0)) {
 				if ((reg.ExtensionID && (CAN1->sFilterRegister[filter_bank].FR2 & 1) == 1))
 					//extended index - next reg
@@ -291,7 +296,7 @@ CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 			break;
 		} else {
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank)) == (reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == (fifo << filter_bank))
+			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t)reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t)fifo << filter_bank))
 					&& ((CAN1->FM1R & (1 << filter_bank)) == 0)) {
 				if (!reg.ExtensionID && CAN1->sFilterRegister[filter_bank].FR2 == 0xFFFFFFFF) {
 					//extended only one filter
@@ -312,8 +317,7 @@ void CAN_FilterEditOff() {
 	CAN1->FMR &= ~CAN_FMR_FINIT;
 }
 
-CAN_Status CAN_Send(uint32_t index32, uint32_t* data, uint16_t length) {
-	CAN_IR index = { .ToUint32 = index32 };
+CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length)  {
 	uint8_t txBox;
 #ifdef CAN_ForceEXID
 	index.ExtensionID = 1;
@@ -340,7 +344,7 @@ CAN_Status CAN_Send(uint32_t index32, uint32_t* data, uint16_t length) {
 	return CANH_Ok;
 }
 
-CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length) {
+CAN_Status CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length) {
 	CAN_Status status = CANH_QueueEmpty;
 //check is there something
 	uint16_t fifo = 0;
@@ -358,7 +362,7 @@ CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length) {
 		}
 	}
 
-	*index32 = CAN1->sFIFOMailBox[fifo].RIR; //get index
+	index->ToUint32 = CAN1->sFIFOMailBox[fifo].RIR; //get index
 	*length = CAN1->sFIFOMailBox[fifo].RDTR & CAN_RDT0R_DLC;
 //don't care if it is 8 byte or 1, you should read only what needed
 	if (data) {
@@ -390,9 +394,54 @@ void CAN1_SCE_IRQHandler(void) {
 	//RuntimeData.Flags.CANErr = 1;
 	//trace_printf("CAN bus RESET, error has occurred");
 }
-void CAN1_RX1_IRQHandler(void) {
+/*void CAN1_RX1_IRQHandler(void) {
 	LC_ReceiveHandler();
 
+}*/
+
+LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *length) {
+	//Small hal overlay for converting LC header packed to CAN specific data
+	CAN_IR rindex;
+	uint16_t rlength;
+	uint8_t state = CAN_Receive(&rindex, data, &rlength);
+	if (state == CANH_Ok) {
+		header->ToUint32 = rindex.EXID; //29b
+		header->Request = rindex.Request; //30b
+		*length = rlength;
+		return LC_Ok;
+	}
+	return LC_BufferEmpty;
+}
+
+LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length) {
+	CAN_IR sindex;
+	sindex.EXID = header.ToUint32;
+	sindex.ExtensionID = 1;
+	sindex.Request = header.Request;
+	uint8_t state = CAN_Send(sindex, data, length);
+	return (state == CANH_Ok) ? LC_Ok : LC_BufferFull;
+}
+
+LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count) {
+	CAN_FiltersClear();
+	CAN_FilterEditOn();
+
+	CAN_IR can_reg, can_mask;
+
+	for (int i = 0; i < count; i++) {
+		can_reg.ToUint32 = 0;
+		can_reg.ExtensionID = 1; //force 29b
+		can_mask.ToUint32 = can_reg.ToUint32;
+		//convert data
+		can_reg.EXID = reg[i].ToUint32;
+		can_reg.Request = reg[i].Request;
+		can_mask.EXID = mask[i].ToUint32;
+		can_mask.Request = mask[i].Request;
+		CAN_CreateFilterMask(can_reg, can_mask, 0);
+	}
+
+	CAN_FilterEditOff();
+	return LC_Ok;
 }
 
 #if defined(STM32F405xx) || defined(STM32F446xx)

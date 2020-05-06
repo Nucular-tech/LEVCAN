@@ -70,5 +70,5 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo);
 CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo);
 void CAN_FilterEditOff(void);
 
-CAN_Status CAN_Send(uint32_t index32, uint32_t* data, uint16_t length);
-CAN_Status CAN_Receive(uint32_t* index32, uint32_t* data, uint16_t* length);
+CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length) ;
+CAN_Status CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length);

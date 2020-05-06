@@ -4,6 +4,13 @@
  *  Created on: 22 march 2018
  *      Author: Vasiliy Sukhoparov (VasiliSk)
  */
+//#define FREERTOS
+#ifdef FREERTOS
+#include "FreeRTOSConfig.h"
+#include "FreeRTOS.h"
+#include "queue.h"
+#include "semphr.h"
+#endif
 
 #pragma once
 
@@ -17,6 +24,8 @@ static inline void lc_disable_irq(void) {
 
 //Memory packing, compiler specific
 #define LEVCAN_PACKED __attribute__((packed))
+//platform specific, define how many bytes in uint8_t
+#define LEVCAN_MIN_BYTE_SIZE 1
 
 #ifdef TRACE
 //Print debug messages using trace_printf
@@ -24,8 +33,6 @@ static inline void lc_disable_irq(void) {
 //You can re-define trace_printf function
 //#define trace_printf printf
 #endif
-//your hal driver file
-#define LEVCAN_HAL "can_hal.h"
 
 //define to use simple file io operations
 #define LEVCAN_FILECLIENT
@@ -71,4 +78,33 @@ static inline void lc_disable_irq(void) {
 #define lcmalloc pvPortMalloc
 #define lcfree vPortFree
 #define lcdelay vTaskDelay
+
+//enable to use RTOS managed queues
+//#define LEVCAN_USE_RTOS_QUEUE
+
+#ifdef LEVCAN_USE_RTOS_QUEUE
+//setup your rtos functions here
+#define LC_QueueCreate(length, itemSize) xQueueCreate(length, itemSize)
+#define LC_QueueDelete(queue) vQueueDelete(queue)
+#define LC_QueueReset(queue) xQueueReset(queue)
+#define LC_QueueSendToBack(queue, buffer, ttwait) xQueueSendToBack(queue, buffer, ttwait)
+#define LC_QueueSendToFront(queue, buffer, ttwait) xQueueSendToFront(queue, buffer, ttwait)
+#define LC_QueueSendToBackISR(queue, item, yieldNeeded) xQueueSendToBackFromISR(queue, item, yieldNeeded)
+#define LC_QueueSendToFrontISR xQueueSendToFrontFromISR
+#define LC_QueueReceive(queue, buffer, ttwait) xQueueReceive(queue, buffer, ttwait)
+#define LC_QueuePeek(queue, buffer, ttwait) xQueuePeek(queue, buffer, ttwait)
+#define LC_QueueReceiveISR xQueueReceiveFromISR
+#define LC_QueueStored(queue) uxQueueMessagesWaiting(queue)
+
+#define LC_SemaphoreCreate xSemaphoreCreateBinary
+#define LC_SemaphoreDelete(sem) vSemaphoreDelete(sem)
+#define LC_SemaphoreGive(sem) xSemaphoreGive(sem)
+#define LC_SemaphoreGiveISR(sem, yieldNeeded) xSemaphoreGiveFromISR(sem, yieldNeeded)
+#define LC_SemaphoreTake(sem, ttwait) xSemaphoreTake(sem, ttwait)
+
+#define LC_RTOSYieldISR(yield) portYIELD_FROM_ISR(yield)
+#define YieldNeeded_t BaseType_t
+#else
+
+#endif
 #endif
