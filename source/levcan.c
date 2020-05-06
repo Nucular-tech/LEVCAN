@@ -1,10 +1,25 @@
-/*
- * LEV-CAN: Light Electric Vehicle CAN protocol [LC]
- * levcan.c
- *
- *  Created on: 17 march 2018
- *      Author: Vasiliy Sukhoparov (VasiliSk)
- */
+/*******************************************************************************
+ * LEVCAN: Light Electric Vehicle CAN protocol [LC]
+ * Copyright (C) 2020 Vasiliy Sukhoparov
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 
 #include "levcan.h"
 #include "levcan_address.h"
@@ -168,7 +183,7 @@ LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 	if (node_table_index)
 		return LC_DataError;
 
-	if (node->ShortName.NodeID < 0 || node->ShortName.NodeID > 125) {
+	if (node->ShortName.NodeID > 125) {
 		uint16_t id = node->Serial % 64;
 		id |= 64;
 		if (id > 125) {
@@ -376,7 +391,7 @@ void LC_ReceiveHandler(void) {
 	uint8_t length = 0;
 	YieldNeeded_t yield = 0;
 
-	while (LC_HAL_Receive(&msgRX.header, &msgRX.data, &length) == LC_Ok) {
+	while (LC_HAL_Receive(&msgRX.header, msgRX.data, &length) == LC_Ok) {
 		//round up and divide to get target cpu message size
 		msgRX.length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
 		LC_QueueSendToBackISR(rxQueue, &msgRX, &yield);
