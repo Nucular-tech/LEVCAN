@@ -8,7 +8,6 @@
 
 #include "levcan.h"
 #include "levcan_address.h"
-#include LEVCAN_HAL
 
 //### Private functions ###
 void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
@@ -16,13 +15,14 @@ void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode);
 int16_t lc_compareNodes(LC_NodeShortName_t a, LC_NodeShortName_t b);
 uint16_t lc_searchIndexCollision(uint16_t nodeID, LC_NodeDescriptor_t *ownNode);
 void lc_claimFreeID(LC_NodeDescriptor_t *node);
-void lc_addAddressFilter(uint16_t address);
 LC_Return_t lc_sendDiscoveryRequest(uint16_t target);
 
 extern LC_Return_t lc_sendDataToQueue(LC_HeaderPacked_t hdr, uint32_t data[], uint8_t length);
 //### Private variables
 extern LC_NodeDescriptor_t own_nodes[];
 extern LC_NodeTable_t node_table[];
+// extern HAL functions
+extern LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count);
 
 void LC_AddressManager(uint32_t time) {
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
@@ -44,9 +44,7 @@ void LC_AddressManager(uint32_t time) {
 				own_nodes[i].State = LCNodeState_WaitingClaim;
 				own_nodes[i].LastTXtime = 0;
 				own_nodes[i].ShortName.NodeID = freeid;
-				CAN_FilterEditOn();
-				lc_addAddressFilter(freeid);
-				CAN_FilterEditOff();
+				LC_ConfigureFilters();
 				lc_addressClaimHandler(own_nodes[i].ShortName, LC_TX);
 #ifdef LEVCAN_TRACE
 				trace_printf("Discovery finish id:%d\n", own_nodes[i].ShortName.NodeID);
@@ -63,7 +61,7 @@ void LC_AddressManager(uint32_t time) {
 				own_nodes[i].LastTXtime += time;
 				if (own_nodes[i].LastTXtime > 250) {
 					own_nodes[i].State = LCNodeState_Online;
-					LC_ConfigureFilters();    //todo make it faster?
+					LC_ConfigureFilters();
 					own_nodes[i].LastTXtime = 0;
 #ifdef LEVCAN_TRACE
 					trace_printf("We are online ID:%d\n", own_nodes[i].ShortName.NodeID);
@@ -265,10 +263,7 @@ void lc_claimFreeID(LC_NodeDescriptor_t *node) {
 	node->LastTXtime = 0;
 	node->State = LCNodeState_WaitingClaim;
 	//add new own address filter TODO add later after verification
-	CAN_FilterEditOn();
-	lc_addAddressFilter(freeid);
-	CAN_FilterEditOff();
-
+	LC_ConfigureFilters();
 }
 
 uint16_t lc_searchIndexCollision(uint16_t nodeID, LC_NodeDescriptor_t *ownNode) {
@@ -298,53 +293,50 @@ int16_t lc_compareNodes(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 
 void LC_ConfigureFilters(void) {
 
-	CAN_FiltersClear();
-	CAN_FilterEditOn();
+	LC_HeaderPacked_t reg[LEVCAN_MAX_OWN_NODES + 1] = { 0 };
+	LC_HeaderPacked_t mask[LEVCAN_MAX_OWN_NODES + 1] = { 0 };
+	int8_t active_filters = 0;
 	//global filter
-	LC_HeaderPacked_t reg = { 0 }, mask = { 0 };
-	reg.MsgID = LC_SYS_AddressClaimed;
+	reg[active_filters].MsgID = LC_SYS_AddressClaimed;
 	//reg.RTS_CTS = 0;    //no matter
 	//reg.Parity = 0;    // no matter
 	//reg.Priority = 0;    //no matter
 	//reg.Source = 0;    //any source
-	reg.Target = LC_Broadcast_Address;    //we are target- Broadcast, this should match
+	reg[active_filters].Target = LC_Broadcast_Address;    //we are target- Broadcast, this should match
 	//reg.Request = 0;
 	//fill can mask match
-	mask = reg;
-	if (own_nodes[0].ShortName.NodeID < LC_Null_Address) {
-		mask.MsgID = 0;    //match any brdcast
-	} else
-		mask.MsgID = 0x3F0;    //match for first 16 system messages
+	mask[active_filters] = reg[active_filters];
+	active_filters++;
 	//mask.Request = 0;    //any request or data
 	//type cast
-	CAN_CreateFilterMask((CAN_IR ) { .ToUint32 = reg.ToUint32 }, (CAN_IR ) { .ToUint32 = mask.ToUint32 }, 0);
-
+	uint8_t active_node_exist = 0;
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
-		if (own_nodes[i].ShortName.NodeID < LC_Null_Address)
-			lc_addAddressFilter(own_nodes[i].ShortName.NodeID);
+		if (own_nodes[i].ShortName.NodeID < LC_Null_Address) {
+			//reg.MsgID = 0;    //no matter
+			//reg.RTS_CTS = 0;    //no matter
+			//reg.Parity = 0;    // no matter
+			//reg.Priority = 0;    //no matter
+			//reg.Source = 0;    //any source
+			reg[active_filters].Target = own_nodes[i].ShortName.NodeID;    //we are target, this should match
+			//reg.Request = 0;    //no matter
+			//fill can mask match
+			//mask = reg;
+			//mask.MsgID = 0;    //match any
+			mask[active_filters].Target = LC_Broadcast_Address;    // should match
+			//mask.Request = 0;    //any request or data
+			//type cast
+			active_node_exist = 1;
+			active_filters++;
+		}
 	}
-	CAN_FilterEditOff();
-}
 
-void lc_addAddressFilter(uint16_t address) {
-	//global filter
-	LC_HeaderPacked_t reg = { 0 }, mask = { 0 };
-	//reg.MsgID = 0;    //no matter
-	//reg.RTS_CTS = 0;    //no matter
-	//reg.Parity = 0;    // no matter
-	//reg.Priority = 0;    //no matter
-	//reg.Source = 0;    //any source
-	reg.Target = address;    //we are target, this should match
-	//reg.Request = 0;    //no matter
-	//fill can mask match
-	//mask = reg;
-	//mask.MsgID = 0;    //match any
-	mask.Target = LC_Broadcast_Address;    // should match
-	//mask.Request = 0;    //any request or data
-	//type cast
-	CAN_CreateFilterMask((CAN_IR ) { .ToUint32 = reg.ToUint32 }, (CAN_IR ) { .ToUint32 = mask.ToUint32 }, 0);
-}
+	if (active_node_exist) {
+		mask[0].MsgID = 0;    //match any brdcast
+	} else
+		mask[0].MsgID = 0x3F0;    //match for first 16 system messages
 
+	LC_HAL_CreateFilterMasks(reg, mask, active_filters);
+}
 
 LC_Return_t lc_sendDiscoveryRequest(uint16_t target) {
 	LC_HeaderPacked_t hdr = { 0 };

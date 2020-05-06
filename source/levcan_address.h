@@ -9,3 +9,4 @@
 
 void LC_AddressManager(uint32_t time);
 void LC_ConfigureFilters(void);
+

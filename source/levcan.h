@@ -13,111 +13,91 @@
 typedef union {
 	uint16_t Attributes;
 	struct {
-		unsigned Readable :1;	//Nodes can read from the variable
-		unsigned Writable :1;	//Nodes may write to the variable
-		unsigned TCP :1;		//Node should control packets sent (RTS/CTS) and create special tx/rx buffer
-		unsigned Priority :2;
-		unsigned Record :1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
-		unsigned Function :1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
+		uint16_t Readable :1;	//Nodes can read from the variable
+		uint16_t Writable :1;	//Nodes may write to the variable
+		uint16_t TCP :1;		//Node should control packets sent (RTS/CTS) and create special tx/rx buffer
+		uint16_t Priority :2;
+		uint16_t Record :1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
+		uint16_t Function :1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
 		//received data will be saved as pointer to memory area, if there is already exists, it will be free
-		unsigned Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
-		unsigned Cleanup :1;	//after transmission pointer will call memfree
+		uint16_t Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
+		uint16_t Cleanup :1;	//after transmission pointer will call memfree
 #ifdef LEVCAN_USE_RTOS_QUEUE
-		unsigned Queue :1;		//will place data on specified queue (address should have queue pointer)
+		uint16_t Queue :1;		//will place data on specified queue (address should have queue pointer)
 #endif
-	}LEVCAN_PACKED;
+	} LEVCAN_PACKED;
 } LC_ObjectAttributes_t;
 
 typedef struct {
 	uint16_t Index; //message id
 	LC_ObjectAttributes_t Attributes;
 	int32_t Size; //in bytes, can be negative (useful for strings), i.e. -1 = maximum length 1, -10 = maximum length 10. Request size 0 returns any first object
-	void* Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
+	void *Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
 } LC_Object_t;
 
 typedef struct {
 	uint8_t NodeID; //filters specified sender ID
 	LC_ObjectAttributes_t Attributes;
 	int32_t Size;
-	void* Address; //pointer to memory data. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
+	void *Address; //pointer to memory data. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
 } LC_ObjectRecord_t;
 
 typedef struct {
 	uint8_t Source;
 	uint8_t Target;
 	uint16_t MsgID;
-	struct {
-		unsigned EoM :1;
-		unsigned Request :1;
-		unsigned Parity :1;
-		unsigned RTS_CTS :1;
-		unsigned Priority :2;
+	union {
+		uint16_t ControlBits;
+		struct {
+			uint16_t EoM :1;
+			uint16_t Parity :1;
+			uint16_t RTS_CTS :1;
+			uint16_t Priority :2;
+			uint16_t Request :1;
+		};
 	};
 } LC_Header_t;
 
 typedef union {
 	uint32_t ToUint32;
 	struct {
-		//can specific:
-		unsigned reserved1 :1;
-		unsigned Request :1;
-		unsigned IDE :1;    //29b=1
 		//index 29bit:
-		unsigned Source :7;
-		unsigned Target :7;
-		unsigned MsgID :10;
-		unsigned EoM :1;
-		unsigned Parity :1;
-		unsigned RTS_CTS :1;
-		unsigned Priority :2;
+		uint32_t Source :7;
+		uint32_t Target :7;
+		uint32_t MsgID :10;
+		uint32_t EoM :1;
+		uint32_t Parity :1;
+		uint32_t RTS_CTS :1;
+		uint32_t Priority :2;
+		//RTR bit:
+		uint32_t Request :1;
 	} LEVCAN_PACKED;
 } LC_HeaderPacked_t;
 
 typedef struct {
 	LC_Header_t Header;
 	int32_t Size;
-	intptr_t* Data;
+	intptr_t *Data;
 } LC_ObjectData_t;
 
 typedef struct {
 	union {
 		uint32_t ToUint32[2];
 		struct {
-			unsigned Configurable :1;
-			unsigned Variables :1;
-			unsigned SWUpdates :1;
-			unsigned Events :1;
-			unsigned FileServer :1;
-			unsigned reserved :(64 - 6 - 32);
-			unsigned DynamicID :1;
-			unsigned DeviceType :10;
-			unsigned ManufacturerCode :10;
-			unsigned SerialNumber :12;
+			uint32_t Configurable :1;
+			uint32_t Variables :1;
+			uint32_t SWUpdates :1;
+			uint32_t Events :1;
+			uint32_t FileServer :1;
+			uint32_t reserved :(64 - 6 - 32);
+			uint32_t DynamicID :1;
+			uint32_t DeviceType :10;
+			uint32_t ManufacturerCode :10;
+			uint32_t SerialNumber :12;
 		};
 	};
 	uint16_t NodeID;
 } LC_NodeShortName_t;
-
-typedef struct {
-	char* NodeName;
-	char* DeviceName;
-	char* VendorName;
-	uint16_t DeviceType; //10bit
-	uint16_t ManufacturerCode; //10bit
-	struct {
-		unsigned Configurable :1; //can be configured using levcan_param
-		unsigned Variables :1; //there are some variables can be read
-		unsigned SWUpdates :1; //device may be updated
-		unsigned Events :1; //can receive events
-		unsigned FileServer :1; //can proceed file io operations from other nodes
-	}LEVCAN_PACKED;
-	int16_t NodeID; //-1 will autodetect, 0-63 preffered address, 64-125 all
-	uint32_t Serial; //SN, used only 12bit
-	LC_Object_t* Objects; //CAN tx/rx user objects array
-	uint16_t ObjectsSize;	//array size (elements)
-	void* Directories; //array of LC_ParameterDirectory_t
-	uint16_t DirectoriesSize; //array size (elements)
-} LC_NodeInit_t;
 
 enum {
 	LC_SYS_AddressClaimed = 0x380,
@@ -143,9 +123,9 @@ enum {
 };
 
 typedef struct {
-	char* NodeName;
-	char* DeviceName;
-	char* VendorName;
+	char *NodeName;
+	char *DeviceName;
+	char *VendorName;
 	uint32_t Serial;
 	LC_NodeShortName_t ShortName;
 	uint32_t LastTXtime;
@@ -153,10 +133,10 @@ typedef struct {
 	enum {
 		LCNodeState_Disabled, LCNodeState_NetworkDiscovery, LCNodeState_WaitingClaim, LCNodeState_Online
 	} State;
-	LC_Object_t* Objects;
+	LC_Object_t *Objects;
 	uint16_t ObjectsSize;
 	LC_Object_t SystemObjects[LC_SYS_End - LC_SYS_NodeName];
-	void* Directories;
+	void *Directories;
 	uint16_t DirectoriesSize;
 } LC_NodeDescriptor_t;
 
@@ -165,7 +145,7 @@ typedef struct {
 	uint32_t LastRXtime;
 } LC_NodeTable_t;
 
-typedef void (*LC_FunctionCall_t)(LC_NodeDescriptor_t* node, LC_Header_t header, void* data, int32_t size);
+typedef void (*LC_FunctionCall_t)(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
@@ -187,7 +167,8 @@ enum {
 	LC_RX, LC_TX, LC_NodeFreeIDmin = 64, LC_NodeFreeIDmax = 125
 };
 
-LC_NodeDescriptor_t* LC_CreateNode(LC_NodeInit_t node);
+LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node);
+LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node);
 //Handlers should be called from CAN HAL ISR
 void LC_ReceiveHandler(void);
 void LC_TransmitHandler(void);
@@ -197,14 +178,14 @@ void LC_NetworkManager(uint32_t time); //low priority
 void LC_ReceiveManager(void); //high priority
 void LC_TransmitManager(void); //high priority
 
-LC_Return_t LC_SendMessage(void* sender, LC_ObjectRecord_t* object, uint16_t index);
-LC_Return_t LC_SendRequest(void* sender, uint16_t target, uint16_t index);
-LC_Return_t LC_SendRequestSpec(void* sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
+LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t index);
+LC_Return_t LC_SendRequest(void *sender, uint16_t target, uint16_t index);
+LC_Return_t LC_SendRequestSpec(void *sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 
-LC_NodeShortName_t LC_GetActiveNodes(uint16_t* last_pos);
+LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos);
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
-LC_NodeShortName_t LC_GetMyNodeName(void* mynode);
-int16_t LC_GetMyNodeIndex(void* mynode);
+LC_NodeShortName_t LC_GetMyNodeName(void *mynode);
+int16_t LC_GetMyNodeIndex(void *mynode);
 
 LC_HeaderPacked_t LC_HeaderPack(LC_Header_t header);
 LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header);
