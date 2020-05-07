@@ -84,7 +84,7 @@ volatile fSrvObj* file_start;
 volatile fSrvObj* file_end;
 volatile int initFS = 0;
 
-void proceedFileServer(LC_NodeDescription_t* node, LC_Header_t header, void* data, int32_t size) {
+void proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data, int32_t size) {
 	if (size < 2 || initFS == 0)
 		return;
 	uint16_t* op = data;

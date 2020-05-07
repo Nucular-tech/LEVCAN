@@ -52,6 +52,7 @@ static inline void lc_disable_irq(void) {
 
 //define to use simple file io operations
 #define LEVCAN_FILECLIENT
+//#define LEVCAN_FILESERVER
 //define to use buffered printf
 #define LEVCAN_BUFFER_FILEPRINTF
 //File operations timeout for client side (ms)

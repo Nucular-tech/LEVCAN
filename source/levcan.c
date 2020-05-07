@@ -275,7 +275,7 @@ LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 	}
 #endif
 #ifdef LEVCAN_FILESERVER
-	if (node.FileServer && proceedFileServer != lc_default_handler) {
+	if (node->ShortName.FileServer && proceedFileServer != lc_default_handler) {
 		//File server
 		objparam = &node->SystemObjects[sysinx++];
 		objparam->Address = proceedFileServer;
