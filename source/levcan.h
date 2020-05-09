@@ -184,25 +184,25 @@ enum {
 	LC_RX, LC_TX, LC_NodeFreeIDmin = 64, LC_NodeFreeIDmax = 125
 };
 
-LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node);
-LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node);
+LC_EXPORT LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node);
+LC_EXPORT LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node);
 //Handlers should be called from CAN HAL ISR
-void LC_ReceiveHandler(void);
-void LC_TransmitHandler(void);
+LC_EXPORT void LC_ReceiveHandler(void);
+LC_EXPORT void LC_TransmitHandler(void);
 
 //Managers should be called from separate tasks, if LEVCAN_USE_RTOS_QUEUE set
-void LC_NetworkManager(uint32_t time); //low priority
-void LC_ReceiveManager(void); //high priority
-void LC_TransmitManager(void); //high priority
+LC_EXPORT void LC_NetworkManager(uint32_t time); //low priority
+LC_EXPORT void LC_ReceiveManager(void); //high priority
+LC_EXPORT void LC_TransmitManager(void); //high priority
 
-LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t index);
-LC_Return_t LC_SendRequest(void *sender, uint16_t target, uint16_t index);
-LC_Return_t LC_SendRequestSpec(void *sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
+LC_EXPORT LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t index);
+LC_EXPORT LC_Return_t LC_SendRequest(void *sender, uint16_t target, uint16_t index);
+LC_EXPORT LC_Return_t LC_SendRequestSpec(void *sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 
-LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos);
-LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
-LC_NodeShortName_t LC_GetMyNodeName(void *mynode);
-int16_t LC_GetMyNodeIndex(void *mynode);
+LC_EXPORT LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos);
+LC_EXPORT LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
+LC_EXPORT LC_NodeShortName_t LC_GetMyNodeName(void *mynode);
+LC_EXPORT int16_t LC_GetMyNodeIndex(void *mynode);
 
-LC_HeaderPacked_t LC_HeaderPack(LC_Header_t header);
-LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header);
+LC_EXPORT LC_HeaderPacked_t LC_HeaderPack(LC_Header_t header);
+LC_EXPORT LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header);

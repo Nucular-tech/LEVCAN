@@ -24,6 +24,9 @@
 #include "levcan.h"
 #include "levcan_address.h"
 
+#ifndef LEVCAN_MIN_BYTE_SIZE
+#define LEVCAN_MIN_BYTE_SIZE 1
+#endif
 //### Private functions ###
 void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode);
@@ -252,7 +255,7 @@ void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 		data[0] = node.ToUint32[0];
 		data[1] = node.ToUint32[1];
 	}
-	lc_sendDataToQueue(header, data, 8);
+	lc_sendDataToQueue(header, data, 8 / LEVCAN_MIN_BYTE_SIZE);
 }
 
 void lc_claimFreeID(LC_NodeDescriptor_t *node) {

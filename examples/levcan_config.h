@@ -37,7 +37,8 @@ static inline void lc_enable_irq(void) {
 static inline void lc_disable_irq(void) {
 	asm volatile ("cpsid i" : : : "memory");
 }
-
+//#define LC_EXPORT __declspec(dllexport)
+#define LC_EXPORT
 //Memory packing, compiler specific
 #define LEVCAN_PACKED __attribute__((packed))
 //platform specific, define how many bytes in uint8_t
