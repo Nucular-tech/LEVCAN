@@ -185,7 +185,7 @@ int32_t LC_GetParameterValue(const LC_ParameterDirectory_t directories[], uint16
 				break;
 #ifdef LEVCAN_USE_FLOAT
 			case VT_float:
-				value = adress.Float[val_index] * powf(10, parameter->Decimal);
+				value = adress.Float[val_index] * pow10i(parameter->Decimal);
 				break;
 #endif
 			}
@@ -224,7 +224,7 @@ int LC_SetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t d
 				break;
 #ifdef LEVCAN_USE_FLOAT
 			case VT_float:
-				adress.Float[val_index] = (float) value / powf(10, parameter->Decimal);
+				adress.Float[val_index] = (float) value / pow10i(parameter->Decimal);
 				break;
 #endif
 			default:

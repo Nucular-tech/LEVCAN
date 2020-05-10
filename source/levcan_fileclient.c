@@ -38,7 +38,6 @@
 #error "Too small LEVCAN_OBJECT_DATASIZE size for file io!"
 #endif
 //extern functions
-extern void* lcdelay(uint32_t time);
 //private functions
 LC_FileResult_t lc_client_sendwait(void *data, uint16_t size, void *sender_node, int16_t *idOut, fOpAck_t *askOut);
 void processReceivedData(int id, fOpData_t *opdata, int32_t rsize);
