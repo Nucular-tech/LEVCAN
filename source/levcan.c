@@ -401,9 +401,9 @@ void LC_ReceiveHandler(void) {
 #else
 	static LC_HeaderPacked_t header;
 	static uint32_t data[2];
-	static uint16_t length;
+	static uint8_t length;
 	//fast receive to clear input buffer, handle later in manager
-	while (LC_HAL_Receive(&header, &data, &length) == LC_Ok) {
+	while (LC_HAL_Receive(&header, data, &length) == LC_Ok) {
 		//buffer not full?
 
 		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE)) {
