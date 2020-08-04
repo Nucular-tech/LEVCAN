@@ -342,11 +342,11 @@ void initialize(void) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-		own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
+	own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_TABLE_NODES; i++)
 #endif
-		node_table[i].ShortName.NodeID = LC_Broadcast_Address;
+	node_table[i].ShortName.NodeID = LC_Broadcast_Address;
 
 #ifdef LEVCAN_STATIC_MEM
 	objectBuffer_freeID = 0;
@@ -645,7 +645,7 @@ uint16_t objectTXproceed(objBuffered *object, LC_HeaderPacked_t *request) {
 	int32_t length;
 	uint32_t data[2];
 	uint32_t step_inc = (8 / LEVCAN_MIN_BYTE_SIZE);
-	uint8_t parity = ~((object->Position + step_inc-1) / step_inc) & 1;    //parity
+	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
 	if (request) {
 		if (request->EoM) {
 			//TX finished? delete this buffer anyway
@@ -874,8 +874,9 @@ LC_Return_t objectRXfinish(LC_HeaderPacked_t header, char *data, int32_t size, u
 #endif
 	}
 //cleanup
-	if (memfree)
+	if (memfree) {
 		lcfree(data);
+	}
 	return ret;
 }
 
@@ -885,12 +886,12 @@ LC_NodeDescriptor_t* findNode(uint16_t nodeID) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-		if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
-			node = &own_nodes[i];
+	if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
+		node = &own_nodes[i];
 #if (LEVCAN_MAX_OWN_NODES) > 1
 			break;
 #endif
-		}
+	}
 	return node;
 
 }

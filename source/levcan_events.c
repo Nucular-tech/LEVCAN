@@ -43,11 +43,10 @@ typedef struct {
 	char Text[];
 } eventSend_t;
 
-
 volatile uint8_t lc_eventButtonPressed = LC_EB_None;
 char lc_event_buffer[LC_EVENT_SIZE];
 
-LC_EventResult_t LC_EventSend(const char* text, const char* caption, LC_EventButtons_t buttons, uint8_t receiver) {
+LC_EventResult_t LC_EventSend(const char *text, const char *caption, LC_EventButtons_t buttons, uint8_t receiver) {
 	if (text == 0 || receiver > LC_Broadcast_Address)
 		return LC_ER_None;
 
@@ -67,7 +66,7 @@ LC_EventResult_t LC_EventSend(const char* text, const char* caption, LC_EventBut
 	if (buffersize > LC_EVENT_SIZE)
 		return LC_ER_None;
 
-	eventSend_t* evnt = (eventSend_t*) lc_event_buffer;
+	eventSend_t *evnt = (eventSend_t*) lc_event_buffer;
 	evnt->Buttons_Icons = buttons;
 	evnt->CaptionSize = caps; //including zero
 	evnt->TextSize = texts;
@@ -103,16 +102,17 @@ void LC_EventReset(uint8_t receiver) {
 /// Returns event server short name
 /// @param scnt Pointer to stored position for search, can be null
 /// @return LC_NodeShortName_t file server
-LC_NodeShortName_t LC_FindEventServer(uint16_t* scnt) {
+LC_NodeShortName_t LC_FindEventServer(uint16_t *scnt) {
 	uint16_t counter = 0;
 	LC_NodeShortName_t node;
 	if (scnt)
 		counter = *scnt;
-	while (node.NodeID != LC_Broadcast_Address) {
+	do {
 		node = LC_GetActiveNodes(&counter);
 		if (node.Events)
 			break;
-	}
+	} while (node.NodeID != LC_Broadcast_Address);
+
 	if (scnt)
 		*scnt = counter;
 	return node;
@@ -125,8 +125,8 @@ LC_NodeShortName_t LC_FindEventServer(uint16_t* scnt) {
 /// @param sender Sender id
 /// @param event Returned event
 /// @return 0 - ok, 1 - error
-int LC_EventReceive(const void* data, int32_t dsize, uint8_t sender, LC_Event_t* event) {
-	const eventSend_t* evt = data;
+int LC_EventReceive(const void *data, int32_t dsize, uint8_t sender, LC_Event_t *event) {
+	const eventSend_t *evt = data;
 	int ret = 0;
 	//check valid
 	if (event == 0 || data == 0 || (int32_t) (evt->TextSize + evt->CaptionSize + sizeof(eventSend_t)) != dsize)

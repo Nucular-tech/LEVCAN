@@ -237,7 +237,7 @@ int LC_SetParameterValue(const LC_ParameterDirectory_t directories[], uint16_t d
 
 void lc_proceedParam(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
 #ifdef LEVCAN_MEM_STATIC
-	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = {0};
+	static char static_buffer[sizeof(parameterValuePacked_t) + 128] = { 0 };
 #endif
 	LC_ObjectRecord_t txrec = { 0 };
 	txrec.Attributes.Priority = LC_Priority_Low;
@@ -266,11 +266,11 @@ void lc_proceedParam(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, 
 				formatlength = strlen(parameter->Formatting);
 			//now allocate full size
 #ifdef LEVCAN_MEM_STATIC
-			parameterValuePacked_t* param_to_send = &static_buffer;
+			parameterValuePacked_t *param_to_send = (void*) &static_buffer;
 			if (namelength + formatlength + 2 > 128) {
 				formatlength = 0;
 				if (namelength + 2 > 128)
-				namelength = 128 - 2;
+					namelength = 128 - 2;
 			}
 #endif
 			int32_t totalsize = sizeof(parameterValuePacked_t) + namelength + formatlength + 2;
@@ -593,6 +593,8 @@ void LC_PrintParam(char *buffer, const LC_ParameterDirectory_t directories[], ui
 	if (index >= dir->Size)
 		return;
 	const LC_ParameterAdress_t *parameter = &dir->Address[index];
+	if (parameter == NULL)
+		return;
 	//for string this enough
 	buffer[0] = 0;
 	switch (parameter->ParamType & PT_typeMask) {

@@ -69,6 +69,11 @@ typedef enum {
 	LC_Obj_AccelerometerRaw,
 	LC_Obj_Accelerometer,
 	LC_Obj_ControlFactorInt,
+	LC_Obj_DCLimitIFactor,
+	LC_Obj_DCLimitIValue,
+	LC_Obj_DCLimitVValue,
+	LC_Obj_DateTime,
+	LC_Obj_DateTimeSet,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -123,20 +128,20 @@ typedef struct {
 } LC_Obj_ControlFactor_t;
 
 typedef struct {
-	uint16_t BrakeFactor; //0...10000
-	uint16_t ThrottleFactor; //0...10000
+	uint16_t BrakeFactor; //100...10000
+	uint16_t ThrottleFactor; //100...10000
 } LC_Obj_ControlFactorInt_t;
 
 typedef struct {
 	union {
 		struct {
 			unsigned int Enable :1; //0
-			unsigned int Brake :1;//1
-			unsigned int Lock :1;//2
-			unsigned int Reverse :1;//3
-			unsigned int Speed :3;//4-6
-			unsigned int Cruise :1;//7
-		}LEVCAN_PACKED ;
+			unsigned int Brake :1; //1
+			unsigned int Lock :1; //2
+			unsigned int Reverse :1; //3
+			unsigned int Speed :3; //4-6
+			unsigned int Cruise :1; //7
+		} LEVCAN_PACKED;
 		uint16_t Buttons;
 	};
 	union {
@@ -157,7 +162,7 @@ typedef struct {
 			unsigned int ExButton14 :1;
 			unsigned int ExButton15 :1;
 			unsigned int ExButton16 :1;
-		}LEVCAN_PACKED ;
+		} LEVCAN_PACKED;
 		uint16_t ExtraButtons;
 	};
 } LC_Obj_Buttons_t;
@@ -191,7 +196,7 @@ typedef union {
 		unsigned int Service :1;
 		unsigned int FanActive :1;
 		unsigned int HeaterActive :1;
-	}LEVCAN_PACKED ;
+	} LEVCAN_PACKED;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
 
@@ -245,3 +250,24 @@ typedef struct {
 	int16_t AxisY;
 	int16_t AxisZ;
 } LC_Obj_Accelerometer_t;
+
+typedef struct {
+	uint16_t Charge; //factor 65536 = 1.0f, value in 0.0A/V
+	uint16_t Discharge; //factor 65536 = 1.0f, value in 0.0A/V
+} LC_Obj_DCLimit_t;
+
+typedef struct {
+	uint16_t Group;
+	uint16_t Charge; //factor 65536 = 1.0f, value in 0.0A/V
+	uint16_t Discharge; //factor 65536 = 1.0f, value in 0.0A/V
+} LC_Obj_DCLimitGroup_t;
+
+typedef struct {
+	uint8_t Hour; //24H
+	uint8_t Minute;
+	uint8_t Second;
+	uint8_t WeekDay; //0=Monday ... 6=Sunday
+	uint8_t Date;
+	uint8_t Month;
+	uint16_t Year;
+} LC_Obj_DateTime_t;
