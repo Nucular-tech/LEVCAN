@@ -1,3 +1,4 @@
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/50630b32be6948d9b6e1a81c14156d79)](https://www.codacy.com/manual/VasiliSker/LEVCAN?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=VasiliSker/LEVCAN&amp;utm_campaign=Badge_Grade)
 # LEVCAN
 Light Electric Vehicle CAN protocol
 
