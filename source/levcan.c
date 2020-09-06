@@ -347,11 +347,11 @@ void initialize(void) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-	own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
+		own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_TABLE_NODES; i++)
 #endif
-	node_table[i].ShortName.NodeID = LC_Broadcast_Address;
+		node_table[i].ShortName.NodeID = LC_Broadcast_Address;
 
 #ifdef LEVCAN_STATIC_MEM
 	objectBuffer_freeID = 0;
@@ -392,15 +392,15 @@ objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint
 void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length) {
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
-	msgBuffered msgRX;
-	uint8_t length = 0;
 	YieldNeeded_t yield = 0;
-
-	while (LC_HAL_Receive(&msgRX.header, msgRX.data, &length) == LC_Ok) {
-		//round up and divide to get target cpu message size
-		msgRX.length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
-		LC_QueueSendToBackISR(rxQueue, &msgRX, &yield);
-	}
+	//packing
+	msgBuffered msgRX;
+	msgRX.data[0] = data[0];
+	msgRX.data[1] = data[1];
+	msgRX.length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
+	msgRX.header = header;
+	//add to queue
+	LC_QueueSendToBackISR(rxQueue, &msgRX, &yield);
 
 	LC_RTOSYieldISR(yield);
 #else
@@ -885,12 +885,12 @@ LC_NodeDescriptor_t* findNode(uint16_t nodeID) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-	if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
-		node = &own_nodes[i];
+		if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
+			node = &own_nodes[i];
 #if (LEVCAN_MAX_OWN_NODES) > 1
 			break;
 #endif
-	}
+		}
 	return node;
 
 }
