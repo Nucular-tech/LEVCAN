@@ -130,7 +130,7 @@ void Init_LEVCAN(void) {
 	node_desc->VendorName = "CompanyName LLC.";
 
 	//Put your unique device codes
-	node_desc->ShortName.ManufacturerCode = 0xABC;
+	node_desc->ShortName.ManufacturerCode = 0x1BC;
 	node_desc->ShortName.NodeID = 31; //default used ID if free
 	node_desc->Serial = 0xDEADBEEF; //use your unique SN
 	node_desc->ShortName.DeviceType = LC_Device_Controller; //Setup device type, used for parsing devices over CAN bus
@@ -157,6 +157,7 @@ void Init_LEVCAN(void) {
 }
 
 void nwrk_manager(void *pvParameters) {
+	(void) pvParameters;
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	xTaskCreate(can_RXmanager, "CRX", configMINIMAL_STACK_SIZE, NULL, OS_PRIORITY_LOW, (TaskHandle_t*) NULL);
 	xTaskCreate(can_TXmanager, "CTX", configMINIMAL_STACK_SIZE, NULL, OS_PRIORITY_MID, (TaskHandle_t*) NULL);

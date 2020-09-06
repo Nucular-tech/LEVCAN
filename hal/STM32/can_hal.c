@@ -38,10 +38,11 @@
 
 const float accuracy = 1.e-3;	// minimum required accuracy of the bit time
 uint8_t _getFreeTX();
-extern void LC_ReceiveHandler(void);
+void receiveIRQ(void);
+extern void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 extern void LC_TransmitHandler(void);
 #ifdef TRACE
-extern int trace_printf(const char* format, ...);
+extern int trace_printf(const char *format, ...);
 #endif
 /// Initialize CAN core using desired freq and bus freq
 /// @param PCLK - prescaler input clock
@@ -102,7 +103,7 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 				// end for an entry with good accuracy
 				//trace_printf("Prescaler: %d, ratio: %.2f, rratio: %d, accy: %.4f\n", brp, ratio, rratio, ((float) rratio - ratio));
 				//trace_printf("tseg1: %d, tseg2: %d, sp: %.1f%%, brp: %d, tq num: %d \n", t_seg1, t_seg2, real_sp, brp, (1 + t_seg1 + t_seg2));
-				break; //done
+				break;//done
 			}
 		}
 	}
@@ -229,8 +230,8 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 			//already active
 			relative = 0;
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t)reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t)fifo << filter_bank))
-					&& ((CAN1->FM1R & (1 << filter_bank)) != 0)) {
+			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t) reg.ExtensionID << filter_bank))
+					&& ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t) fifo << filter_bank)) && ((CAN1->FM1R & (1 << filter_bank)) != 0)) {
 				if ((reg.ExtensionID && (CAN1->sFilterRegister[filter_bank].FR2 & 1) == 1))
 					//extended index - next reg
 					relative = 1;
@@ -315,8 +316,8 @@ CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 			break;
 		} else {
 			//check same filtersize, fifo and index mode
-			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t)reg.ExtensionID << filter_bank)) && ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t)fifo << filter_bank))
-					&& ((CAN1->FM1R & (1 << filter_bank)) == 0)) {
+			if (((CAN1->FS1R & (1 << filter_bank)) == ((uint32_t) reg.ExtensionID << filter_bank))
+					&& ((CAN1->FFA1R & (1 << filter_bank)) == ((uint32_t) fifo << filter_bank)) && ((CAN1->FM1R & (1 << filter_bank)) == 0)) {
 				if (!reg.ExtensionID && CAN1->sFilterRegister[filter_bank].FR2 == 0xFFFFFFFF) {
 					//extended only one filter
 					CAN1->sFilterRegister[filter_bank].FR2 = ((reg.STID << 5) | (reg.Request << 4)) | (((mask.STID << 5) | (mask.Request << 4)) << 16);
@@ -336,7 +337,7 @@ void CAN_FilterEditOff() {
 	CAN1->FMR &= ~CAN_FMR_FINIT;
 }
 
-CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length)  {
+CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length) {
 	uint8_t txBox;
 #ifdef CAN_ForceEXID
 	index.ExtensionID = 1;
@@ -387,7 +388,7 @@ CAN_Status CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length) {
 	if (data) {
 		data[0] = CAN1->sFIFOMailBox[fifo].RDLR;
 		data[1] = CAN1->sFIFOMailBox[fifo].RDHR;
-	}	
+	}
 	if (fifo == 0)
 		CAN1->RF0R = CAN_RF0R_RFOM0;
 	else
@@ -414,9 +415,9 @@ void CAN1_SCE_IRQHandler(void) {
 	//trace_printf("CAN bus RESET, error has occurred");
 }
 /*void CAN1_RX1_IRQHandler(void) {
-	LC_ReceiveHandler();
+ LC_ReceiveHandler();
 
-}*/
+ }*/
 
 LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *length) {
 	//Small hal overlay for converting LC header packed to CAN specific data
@@ -465,7 +466,7 @@ LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *
 
 #if defined(STM32F405xx) || defined(STM32F446xx)
 void CAN1_RX0_IRQHandler(void) {
-	LC_ReceiveHandler();
+	receiveIRQ();
 }
 void CAN1_TX_IRQHandler(void) {
 	//remove interrupts
@@ -478,7 +479,7 @@ void CAN1_TX_IRQHandler(void) {
 
 #if defined(STM32F10X_MD) || defined(STM32F30X)
 void USB_LP_CAN1_RX0_IRQHandler(void) {
-	LC_ReceiveHandler();
+	 receiveIRQ() ;
 }
 void USB_HP_CAN1_TX_IRQHandler(void) {
 	//remove interrupts
@@ -487,3 +488,16 @@ void USB_HP_CAN1_TX_IRQHandler(void) {
 }
 #endif
 
+void receiveIRQ(void) {
+	CAN_IR rindex;
+	uint16_t rlength;
+	uint32_t data[2];
+	uint8_t state = CAN_Receive(&rindex, data, &rlength);
+	//receive everything
+	for (; state == CANH_Ok; state = CAN_Receive(&rindex, data, &rlength)) {
+		LC_HeaderPacked_t header = { 0 };
+		header.ToUint32 = rindex.EXID; //29b
+		header.Request = rindex.Request; //30b
+		LC_ReceiveHandler(header, data, rlength);
+	}
+}

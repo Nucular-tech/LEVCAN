@@ -111,6 +111,7 @@ volatile uint16_t own_node_count;
 volatile uint32_t lc_collision_cntr = 0;
 volatile uint32_t lc_receive_ovfl_cntr = 0;
 #endif
+const char *empty_line = "Undefined.";
 //#### PRIVATE FUNCTIONS ####
 void initialize(void);
 
@@ -134,7 +135,7 @@ objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint
 void lc_default_handler(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 //#### EXTERNAL MODULES ####
 //HAL send/receive
-extern LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *length);
+//extern LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *length);
 extern LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 
 #ifdef LEVCAN_EVENTS
@@ -169,6 +170,10 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node) {
 			//clean up
 			own_nodes[i].State = LCNodeState_Disabled;
 			memset(own_nodes[i].SystemObjects, 0, sizeof(own_nodes[i].SystemObjects));
+			own_nodes[i].ShortName.CodePage = 1250; //Central European
+			own_nodes[i].DeviceName = (char*) empty_line;
+			own_nodes[i].NodeName = (char*) empty_line;
+			own_nodes[i].VendorName = (char*) empty_line;
 			*node = &own_nodes[i];
 			return LC_Ok;
 		}
@@ -384,7 +389,7 @@ objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint
 	return 0;
 }
 
-void LC_ReceiveHandler(void) {
+void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length) {
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	msgBuffered msgRX;
@@ -399,27 +404,21 @@ void LC_ReceiveHandler(void) {
 
 	LC_RTOSYieldISR(yield);
 #else
-	static LC_HeaderPacked_t header;
-	static uint32_t data[2];
-	static uint8_t length;
-	//fast receive to clear input buffer, handle later in manager
-	while (LC_HAL_Receive(&header, data, &length) == LC_Ok) {
-		//buffer not full?
 
-		if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE)) {
+	if (rxFIFO_in == ((rxFIFO_out - 1 + LEVCAN_RX_SIZE) % LEVCAN_RX_SIZE)) {
 #ifdef DEBUG
-								lc_receive_ovfl_cntr++;
-					#endif
-			continue;
-		}
-		//store in rx buffer
-		msgBuffered *msgRX = &rxFIFO[rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
-		msgRX->data[0] = data[0];
-		msgRX->data[1] = data[1];
-		msgRX->length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
-		msgRX->header = header;
-		rxFIFO_in = (rxFIFO_in + 1) % LEVCAN_RX_SIZE;
+		lc_receive_ovfl_cntr++;
+#endif
+		return;
 	}
+	//store in rx buffer
+	msgBuffered *msgRX = &rxFIFO[rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
+	msgRX->data[0] = data[0];
+	msgRX->data[1] = data[1];
+	msgRX->length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
+	msgRX->header = header;
+	rxFIFO_in = (rxFIFO_in + 1) % LEVCAN_RX_SIZE;
+
 #endif
 }
 

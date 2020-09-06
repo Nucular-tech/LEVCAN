@@ -20,7 +20,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  ******************************************************************************/
-//#define FREERTOS
+#define FREERTOS
 #ifdef FREERTOS
 #include "FreeRTOSConfig.h"
 #include "FreeRTOS.h"

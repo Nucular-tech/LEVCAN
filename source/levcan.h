@@ -101,16 +101,18 @@ typedef struct {
 	union {
 		uint32_t ToUint32[2];
 		struct {
-			uint32_t Configurable :1;
-			uint32_t Variables :1;
-			uint32_t SWUpdates :1;
-			uint32_t Events :1;
-			uint32_t FileServer :1;
-			uint32_t reserved :(64 - 6 - 32);
-			uint32_t DynamicID :1;
-			uint32_t DeviceType :10;
-			uint32_t ManufacturerCode :10;
-			uint32_t SerialNumber :12;
+			uint32_t Configurable :1; 	//0
+			uint32_t Variables :1; 		//1
+			uint32_t SWUpdates :1; 		//2
+			uint32_t Events :1; 		//3
+			uint32_t FileServer :1;		//4
+			uint32_t CodePage :16;		//5-20 https://docs.microsoft.com/en-us/dotnet/api/system.text.encoding?view=netcore-3.1
+			uint32_t reserved1 :(32 - 5 - 16 - 1);//21-30
+			uint32_t DynamicID :1;		//31
+			//32b align
+			uint32_t DeviceType :10;	//32-41
+			uint32_t ManufacturerCode :10;//42-51
+			uint32_t SerialNumber :12;	//52-63
 		};
 	};
 	uint16_t NodeID;
@@ -187,7 +189,7 @@ enum {
 LC_EXPORT LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node);
 LC_EXPORT LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node);
 //Handlers should be called from CAN HAL ISR
-LC_EXPORT void LC_ReceiveHandler(void);
+LC_EXPORT void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 LC_EXPORT void LC_TransmitHandler(void);
 
 //Managers should be called from separate tasks, if LEVCAN_USE_RTOS_QUEUE set
