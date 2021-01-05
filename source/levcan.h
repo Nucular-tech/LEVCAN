@@ -128,7 +128,7 @@ enum {
 	LC_SYS_HWVersion,
 	LC_SYS_SWVersion,
 	LC_SYS_SerialNumber,
-	LC_SYS_Parameters,
+	LC_SYS_Parameters, //old parameters
 	LC_SYS_Variables,
 	LC_SYS_Events,
 	LC_SYS_Trace,
@@ -138,6 +138,11 @@ enum {
 	LC_SYS_FileServer,
 	LC_SYS_FileClient,
 	LC_SYS_SaveData,
+	LC_SYS_ParametersRequest,
+	LC_SYS_ParametersData,
+	LC_SYS_ParametersDescriptor,
+	LC_SYS_ParametersName,
+	LC_SYS_ParametersText,
 	LC_SYS_End,
 };
 
@@ -157,6 +162,7 @@ typedef struct {
 	LC_Object_t SystemObjects[LC_SYS_End - LC_SYS_NodeName];
 	void *Directories;
 	uint16_t DirectoriesSize;
+	uint8_t AccessLevel;
 } LC_NodeDescriptor_t;
 
 typedef struct {
