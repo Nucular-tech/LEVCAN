@@ -348,7 +348,7 @@ void initialize(void) {
 	for (i = 0; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
 		own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
-#if (LEVCAN_MAX_OWN_NODES) > 1
+#if (LEVCAN_MAX_TABLE_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_TABLE_NODES; i++)
 #endif
 		node_table[i].ShortName.NodeID = LC_Broadcast_Address;
