@@ -252,14 +252,14 @@ typedef struct {
 } LC_Obj_Accelerometer_t;
 
 typedef struct {
-	uint16_t Charge; //factor 65536 = 1.0f, value in 0.0A/V
-	uint16_t Discharge; //factor 65536 = 1.0f, value in 0.0A/V
+	uint16_t Charge; //factor 32767 = 1.0f
+	uint16_t Discharge; //factor 32767 = 1.0f
 } LC_Obj_DCLimit_t;
 
 typedef struct {
 	uint16_t Group;
-	uint16_t Charge; //factor 65536 = 1.0f, value in 0.0A/V
-	uint16_t Discharge; //factor 65536 = 1.0f, value in 0.0A/V
+	uint16_t Charge; //factor 32767 = 1.0f
+	uint16_t Discharge; //factor 32767 = 1.0f
 } LC_Obj_DCLimitGroup_t;
 
 typedef struct {

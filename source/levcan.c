@@ -90,12 +90,16 @@ objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
 int16_t objectBuffer_freeID;
 #endif
 #ifdef LEVCAN_USE_RTOS_QUEUE
+#ifndef LEVCAN_NO_TX_QUEUE
 void *txQueue;
 void *txSemph;
+#endif
 void *rxQueue;
 #else
+#ifndef LEVCAN_NO_TX_QUEUE
 msgBuffered txFIFO[LEVCAN_TX_SIZE];
 volatile uint16_t txFIFO_in, txFIFO_out;
+#endif
 msgBuffered rxFIFO[LEVCAN_RX_SIZE];
 volatile uint16_t rxFIFO_in, rxFIFO_out;
 #endif
@@ -129,7 +133,9 @@ objBuffered* getFreeObject(void);
 void releaseObject(objBuffered *obj);
 #endif
 
+#ifndef LEVCAN_NO_TX_QUEUE
 int32_t getTXqueueSize(void);
+#endif
 objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint8_t source);
 
 void lc_default_handler(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
@@ -204,17 +210,23 @@ LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 		node->VendorName = 0;
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
-	txQueue = LC_QueueCreate(LEVCAN_TX_SIZE, sizeof(msgBuffered));
 	rxQueue = LC_QueueCreate(LEVCAN_RX_SIZE, sizeof(msgBuffered));
+#ifndef LEVCAN_NO_TX_QUEUE
+	txQueue = LC_QueueCreate(LEVCAN_TX_SIZE, sizeof(msgBuffered));
 	txSemph = LC_SemaphoreCreate();
 
-	if (rxQueue == NULL || rxQueue == NULL || txSemph == NULL) {
+	if (rxQueue == NULL || txQueue == NULL || txSemph == NULL) {
 		LC_SemaphoreDelete(txSemph);
 		LC_QueueDelete(txQueue);
 		LC_QueueDelete(rxQueue);
-
 		return 0;
 	}
+#else
+	if (rxQueue == NULL) {
+		LC_QueueDelete(rxQueue);
+		return 0;
+	}
+#endif
 #endif
 
 	node->State = LCNodeState_Disabled;
@@ -347,7 +359,7 @@ void initialize(void) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-		own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
+	own_nodes[i].ShortName.NodeID = LC_Broadcast_Address;
 #if (LEVCAN_MAX_TABLE_NODES) > 1
 	for (i = 0; i < LEVCAN_MAX_TABLE_NODES; i++)
 #endif
@@ -365,6 +377,7 @@ void initialize(void) {
 	LC_ConfigureFilters();
 }
 
+#ifndef LEVCAN_NO_TX_QUEUE
 int32_t getTXqueueSize(void) {
 #ifndef LEVCAN_USE_RTOS_QUEUE
 	if (txFIFO_in >= txFIFO_out)
@@ -375,6 +388,7 @@ int32_t getTXqueueSize(void) {
 	return LC_QueueStored(txQueue);
 #endif
 }
+#endif
 
 objBuffered* findObject(objBuffered *array, uint16_t msgID, uint8_t target, uint8_t source) {
 	objBuffered *obj = array;
@@ -606,6 +620,7 @@ LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header) {
 
 LC_Return_t lc_sendDataToQueue(LC_HeaderPacked_t hdr, uint32_t data[], uint8_t length) {
 
+#ifndef	LEVCAN_NO_TX_QUEUE
 #ifndef LEVCAN_USE_RTOS_QUEUE
 	lc_disable_irq();
 	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE)) {
@@ -633,6 +648,10 @@ LC_Return_t lc_sendDataToQueue(LC_HeaderPacked_t hdr, uint32_t data[], uint8_t l
 	txFIFO[txFIFO_in] = msgTX;
 	txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
 	lc_enable_irq();
+#endif
+#else
+	//direct data send
+	LC_HAL_Send(hdr,data,length);
 #endif
 	//proceed queue if we can do, NOT THREAD SAFE
 	//	if (empty)
@@ -721,7 +740,11 @@ uint16_t objectTXproceed(objBuffered *object, LC_HeaderPacked_t *request) {
 		object->Header = newhdr;    //update to new only here
 		object->Time_since_comm = 0;    //data sent
 		//cycle if this is UDP till message end or buffer 3/4 fill
-	} while ((object->Flags.TCP == 0) && (getTXqueueSize() * 4 < LEVCAN_TX_SIZE * 3) && (object->Header.EoM == 0));
+	} while ((object->Flags.TCP == 0)
+#ifndef LEVCAN_NO_TX_QUEUE
+			&& (getTXqueueSize() * 4 < LEVCAN_TX_SIZE * 3)
+#endif
+			&& (object->Header.EoM == 0));
 	//in UDP mode delete object when EoM is set
 	if ((object->Flags.TCP == 0) && (object->Header.EoM == 1)) {
 		if (object->Flags.TXcleanup) {
@@ -885,12 +908,12 @@ LC_NodeDescriptor_t* findNode(uint16_t nodeID) {
 #if (LEVCAN_MAX_OWN_NODES) > 1
 	for (; i < LEVCAN_MAX_OWN_NODES; i++)
 #endif
-		if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
-			node = &own_nodes[i];
+	if (own_nodes[i].ShortName.NodeID == nodeID || (nodeID == LC_Broadcast_Address)) {
+		node = &own_nodes[i];
 #if (LEVCAN_MAX_OWN_NODES) > 1
 			break;
 #endif
-		}
+	}
 	return node;
 
 }
@@ -1200,14 +1223,14 @@ void LC_ReceiveManager(void) {
 		}
 	}
 }
-
+#ifndef LEVCAN_NO_TX_QUEUE
 void LC_TransmitManager(void) {
 //fill TX buffer till no empty slots
 //Some thread safeness
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	msgBuffered msgTX;
 
-//look for new messages
+	//look for new messages
 	while (LC_QueueReceive(txQueue, &msgTX, 100)) {
 		//clear TX semaphore, maybe there is a lot of time passed alrdy
 		LC_SemaphoreTake(txSemph, 0);
@@ -1245,6 +1268,7 @@ void LC_TransmitHandler(void) {
 	LC_TransmitManager();
 #endif
 }
+#endif
 
 LC_NodeShortName_t LC_GetNode(uint16_t nodeID) {
 	int i = 0;
