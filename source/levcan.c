@@ -350,10 +350,11 @@ void initialize(void) {
 	rxFIFO_in = 0;
 	rxFIFO_out = 0;
 	memset(rxFIFO, 0, sizeof(rxFIFO));
-
+#ifndef LEVCAN_NO_TX_QUEUE
 	txFIFO_in = 0;
 	txFIFO_out = 0;
 	memset(txFIFO, 0, sizeof(txFIFO));
+#endif
 #endif
 	int i = 0;
 #if (LEVCAN_MAX_OWN_NODES) > 1
