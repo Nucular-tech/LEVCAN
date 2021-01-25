@@ -146,6 +146,10 @@ enum {
 	LC_SYS_End,
 };
 
+enum {
+	LCNodeState_Disabled, LCNodeState_NetworkDiscovery, LCNodeState_WaitingClaim, LCNodeState_Online
+};
+
 typedef struct {
 	char *NodeName;
 	char *DeviceName;
@@ -154,15 +158,14 @@ typedef struct {
 	LC_NodeShortName_t ShortName;
 	uint32_t LastTXtime;
 	uint16_t LastID;
-	enum {
-		LCNodeState_Disabled, LCNodeState_NetworkDiscovery, LCNodeState_WaitingClaim, LCNodeState_Online
-	} State;
-	LC_Object_t *Objects;
-	uint16_t ObjectsSize;
-	LC_Object_t SystemObjects[LC_SYS_End - LC_SYS_NodeName];
-	void *Directories;
-	uint16_t DirectoriesSize;
+	uint8_t State;
 	uint8_t AccessLevel;
+	LC_Object_t *Objects;
+	LC_Object_t *SystemObjects;
+	void *Directories;
+	uint16_t ObjectsSize;
+	uint16_t SystemSize;
+	uint16_t DirectoriesSize;
 } LC_NodeDescriptor_t;
 
 typedef struct {
