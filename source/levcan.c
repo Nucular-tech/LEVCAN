@@ -988,7 +988,7 @@ LC_ObjectRecord_t findObjectRecord(uint16_t messageID, int32_t size, LC_NodeDesc
 					//@formatter:off
 							//Group A
 							((size == record[irec].Size) || 							//precise size match (positive only)
-							((record[irec].Size < 0) && (-size >= record[irec].Size)) ||//variable size (up to -Size, where Size is negative)
+							((record[irec].Size < 0) && (-size >= record[irec].Size)) ||//variable size (up to -Size, where Size is negative) Note: INT_MIN == -INT_MIN, comparison will be broken
 							(read_write == Read && size == 0)) &&  						//read (request) any first object if request size is 0
 							//Group B
 							((record[irec].Attributes.Readable != read_write) || 		//read access (should be .Readable=1)

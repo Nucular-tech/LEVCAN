@@ -20,11 +20,13 @@ Features
 
 System requirements
 ----------------
-C11
-Little endian
-8bit = int8_t
-RTOS recommended for faster responce and needed for advanced features
-
+ - C11
+ - Little endian
+ - 8bit = int8_t
+ - RTOS recommended for faster responce and needed for advanced features
+ - Approximate size:
+![alt text](https://i.imgur.com/G70JQeg.png)
+ 
 Low level info
 ----------------
 Each message that is sent by a Node contains source address. There are 128 possible addresses: 
