@@ -24,7 +24,8 @@ System requirements
  - Little endian
  - 8bit = int8_t
  - RTOS recommended for faster responce and needed for advanced features
- - Approximate size:
+ - Binary size for gcc -O2 on Cortex M4:
+ 
 ![alt text](https://i.imgur.com/G70JQeg.png)
  
 Low level info
