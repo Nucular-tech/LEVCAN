@@ -46,7 +46,7 @@ typedef union {
 } LC_ObjectAttributes_t;
 
 typedef struct {
-	uint16_t Index; //message id
+	uint16_t MsgID; //message id
 	LC_ObjectAttributes_t Attributes;
 	int32_t Size; //in bytes, can be negative (useful for strings), i.e. -1 = maximum length 1, -10 = maximum length 10. Request size 0 returns any first object
 	void *Address; //pointer to variable or LC_FunctionCall_t or LC_ObjectRecord_t[]. if LC_ObjectAttributes_t.Pointer=1, this is pointer to pointer
@@ -107,11 +107,11 @@ typedef struct {
 			uint32_t Events :1; 		//3
 			uint32_t FileServer :1;		//4
 			uint32_t CodePage :16;		//5-20 https://docs.microsoft.com/en-us/dotnet/api/system.text.encoding?view=netcore-3.1
-			uint32_t reserved1 :(32 - 5 - 16 - 1);//21-30
+			uint32_t reserved1 :(32 - 5 - 16 - 1);		//21-30
 			uint32_t DynamicID :1;		//31
 			//32b align
 			uint32_t DeviceType :10;	//32-41
-			uint32_t ManufacturerCode :10;//42-51
+			uint32_t ManufacturerCode :10;	//42-51
 			uint32_t SerialNumber :12;	//52-63
 		};
 	};
@@ -143,6 +143,7 @@ enum {
 	LC_SYS_ParametersDescriptor,
 	LC_SYS_ParametersName,
 	LC_SYS_ParametersText,
+	LC_SYS_ParametersValue,
 	LC_SYS_End,
 };
 
@@ -180,7 +181,7 @@ typedef enum {
 } LC_Priority_t;
 
 typedef enum {
-	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout
+	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout, LC_OutOfRange, LC_AccessError
 } LC_Return_t;
 
 typedef enum {

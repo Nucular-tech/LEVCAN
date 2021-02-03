@@ -8,8 +8,8 @@ Uses 29bit CAN network (1MBps default), check dev branches for latest builds.
 
 Features
 ----------------
- - Two transmission modes, TCP (controlled reception and data order) and UDP 
- - Multiple nodes supported for one device
+ - Two transmission modes, "TCP" (controlled reception and data order) and "UDP"
+ - Multiple nodes supported for one device (not really yet)
  - Dynamic network address
  - Configurable parameters for devices
  - Simple file i/o with file server
@@ -18,13 +18,12 @@ Features
  - 10 bit message ID + length matching
  - Broadcast and adressed messages
 
-Planned (todo)
+System requirements
 ----------------
-- Data bus abstraction layer, bridges between different buses
-- Make possible own node requests (frontend and backend in single node)
-- Better TCP message
-- Sockets?
-- Something like CANOPEN Service Data Object (SDO) protocol, where you can ask node to repeately send some objects
+C11
+Little endian
+8bit = int8_t
+RTOS recommended for faster responce and needed for advanced features
 
 Low level info
 ----------------
