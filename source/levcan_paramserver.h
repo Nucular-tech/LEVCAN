@@ -1,0 +1,70 @@
+/*******************************************************************************
+ * LEVCAN: Light Electric Vehicle CAN protocol [LC]
+ * Copyright (C) 2020 Vasiliy Sukhoparov
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
+
+#include <stdint.h>
+#include "levcan.h"
+#include "levcan_paramcommon.h"
+
+#pragma once
+
+typedef LC_Return_t (*LCP_ParameterCallback_t)(LC_NodeDescriptor_t *node, LC_Header_t header, void *entry_out, uint16_t directory_index,
+		uint16_t entry_index);
+
+typedef struct {
+	uint8_t EntryType; //LCP_Type_t
+	uint8_t AccessLvl; //LCP_AccessLvl_t
+	uint8_t Mode; //LCP_Mode_t
+	uint8_t Function;
+	union {
+		uint16_t VarSize; //in bytes
+		uint16_t DirectoryIndex;
+	};
+	uint16_t DescSize; //in bytes
+	union {
+		const void *Variable; //address of variable or structure
+		LCP_ParameterCallback_t Callback;
+	};
+	const void *Descriptor; //depends on LCP_Type_t
+	const char *Name; //null terminated
+	const char *TextData; //null terminated
+} LCPS_Entry_t;
+
+typedef struct {
+	uint16_t Size;
+	uint8_t ArrayIndex;
+	uint8_t AccessLvl; //LCP_AccessLvl_t
+	const char *Name; //null terminated
+	const LCPS_Entry_t *Entries;
+} LCPS_Directory_t;
+
+
+#define standardTypes(_val)  _Generic((_val),		\
+		LCP_Uint32_t: 	LCP_Uint32,	\
+		LCP_Int32_t: 	LCP_Int32,	\
+		LCP_Uint64_t: 	LCP_Uint64,	\
+		LCP_Int64_t: 	LCP_Int64,	\
+		LCP_Float_t: 	LCP_Float,	\
+		LCP_Double_t: 	LCP_Double)
+
+#define param( _AccessLvl, _Mode, _Var, _Desc, _Name, _Text) \
+	{standardTypes(_Desc), _AccessLvl, _Mode, 0, sizeof(_Var), sizeof(_Desc), (void*)&_Var, (void*)&_Desc, _Name, _Text}
