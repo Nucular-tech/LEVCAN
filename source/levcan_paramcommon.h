@@ -57,16 +57,17 @@ typedef enum {
 	LCP_Uint64, //LCP_Uint64_t
 	LCP_Float, //LCP_Float_t
 	LCP_Double, //LCP_Double_t
-	LCP_Plot2Dsimple_int32, //LCP_Plot2Dsimple_int32_t
+	LCP_String, //LCP_String_t
 	LCP_End = 0xFF
 } LCP_Type_t;
 
-typedef struct {
-} LCP_Bool_t;
+/*typedef struct {
+
+ } LCP_Bool_t;*/
 
 typedef struct {
 	uint32_t Min;
-	uint32_t Max;
+	uint32_t Size;
 } LCP_Enum_t;
 
 typedef struct {
@@ -114,15 +115,21 @@ typedef struct {
 } LCP_Double_t;
 
 typedef struct {
-	struct {
-		int32_t Min;
-		int32_t Max;
-		int32_t Step;
-	} X;
-	struct {
-		int32_t Min;
-		int32_t Max;
-		int32_t Step;
-	} Y;
-	uint8_t DataSize;
-} LCP_Plot2Dsimple_int32_t;
+	uint16_t Flags; //LCP_StringFlags
+} LCP_String_t;
+
+typedef enum {
+	StringFlags_None = 0, // just text
+	StringFlags_Numeric = 1 << 0, // numbers only
+	StringFlags_Letters = 1 << 1, // letters only
+	StringFlags_SpecChar = 1 << 2, // special character, e.g., ! @ # ?
+	StringFlags_Password = 1 << 3, // show only ***
+	StringFlags_Email = 1 << 4, // one@two.com
+	StringFlags_Phone = 1 << 5, // +1(234)567 89 89
+	StringFlags_Website = 1 << 6, // www.dot.com
+	StringFlags_Multiline = 1 << 7, // allow /r/n
+	StringFlags_UTF8 = 1 << 8, // force UTF8 encoding (char)
+	StringFlags_UTF16 = 1 << 9, // force UTF16 encoding (wchar)
+} LCP_StringFlags;
+
+LC_EXPORT LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type);

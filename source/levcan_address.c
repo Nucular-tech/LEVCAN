@@ -42,6 +42,8 @@ extern LC_NodeTable_t node_table[];
 // extern HAL functions
 extern LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count);
 
+LC_RemoteNodeCallback_t lc_addressCallback = 0;
+
 void LC_AddressManager(uint32_t time) {
 	for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
 		if (own_nodes[i].State == LCNodeState_Disabled)
@@ -205,7 +207,12 @@ void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 #ifdef LEVCAN_TRACE
 					trace_printf("Lost S/N:%08X ID:%d\n", node.SerialNumber, node_table[i].ShortName.NodeID);
 #endif
+					if (lc_addressCallback) {
+						lc_addressCallback(node_table[i].ShortName, i, LC_AdressDeleted);
+					}
+
 					node_table[i].ShortName.NodeID = LC_Broadcast_Address;
+
 					return;
 				}
 			return;
@@ -225,6 +232,10 @@ void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 						//less value - more priority. our table not less, setup new short name
 						node_table[i].ShortName = node;
 						node_table[i].LastRXtime = 0;
+
+						if (lc_addressCallback) {
+							lc_addressCallback(node, i, LC_AdressChanged);
+						}
 #ifdef LEVCAN_TRACE
 						trace_printf("Replaced ID: %d from S/N: 0x%04X to S/N: 0x%04X\n", node_table[i].ShortName.NodeID, node_table[i].ShortName.SerialNumber,
 								node.SerialNumber);
@@ -239,6 +250,10 @@ void lc_addressClaimHandler(LC_NodeShortName_t node, uint16_t mode) {
 			if (empty != 255) {
 				node_table[empty].ShortName = node;
 				node_table[empty].LastRXtime = 0;
+
+				if (lc_addressCallback) {
+					lc_addressCallback(node, empty, LC_AdressNew);
+				}
 #ifdef LEVCAN_TRACE
 				trace_printf("New node detected ID:%d\n", node.NodeID);
 #endif

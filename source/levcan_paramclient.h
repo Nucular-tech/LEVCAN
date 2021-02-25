@@ -55,6 +55,9 @@ typedef struct {
 	uint16_t DirectoryIndex;
 } LCPC_Directory_t;
 
-LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry);
-void LCP_CleanEntry(LCPC_Entry_t *entry);
-LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory);
+LC_EXPORT LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry);
+LC_EXPORT LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory);
+LC_EXPORT LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint16_t directory_index, uint16_t entry_index, intptr_t *value, uint16_t valueSize);
+LC_EXPORT LC_Return_t LCP_RequestValue(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, intptr_t *outVariable, uint16_t varSize);
+LC_EXPORT void LCP_CleanEntry(LCPC_Entry_t *entry);
+LC_EXPORT void LCP_CleanDirectory(LCPC_Directory_t *dir);

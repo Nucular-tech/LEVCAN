@@ -189,7 +189,7 @@ typedef enum {
 } LC_Shutdown_t;
 
 enum {
-	LC_Preffered_Address = 0, LC_Normal_Address = 64, LC_Null_Address = 126, LC_Broadcast_Address = 127,
+	LC_Preffered_Address = 0, LC_Normal_Address = 64, LC_Null_Address = 126, LC_Broadcast_Address = 127, LC_Invalid_Address = 0xFF
 };
 
 enum {
