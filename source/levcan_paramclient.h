@@ -55,6 +55,7 @@ typedef struct {
 	uint16_t DirectoryIndex;
 } LCPC_Directory_t;
 
+LC_EXPORT LC_Return_t LCP_ParameterClientInit(LC_NodeDescriptor_t *node);
 LC_EXPORT LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry);
 LC_EXPORT LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory);
 LC_EXPORT LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint16_t directory_index, uint16_t entry_index, intptr_t *value, uint16_t valueSize);

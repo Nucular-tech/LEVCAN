@@ -1,17 +1,17 @@
 /*******************************************************************************
  * LEVCAN: Light Electric Vehicle CAN protocol [LC]
  * Copyright (C) 2020 Vasiliy Sukhoparov
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -27,6 +27,7 @@
 #include <math.h>
 
 #include "levcan.h"
+#include "levcan_internal.h"
 #include "levcan_fileclient.h"
 #include "levcan_fileserver.h"
 #include "levcan_filedef.h"
@@ -56,21 +57,7 @@ typedef struct {
 	void* Previous;
 } fSrvObj;
 
-//extern functions
-extern LC_FileResult_t lcfopen(void** fileObject, char* name, LC_FileAccess_t mode);
-extern uint32_t lcftell(void* fileObject);
-extern LC_FileResult_t lcflseek(void* fileObject, uint32_t pointer);
-extern LC_FileResult_t lcfread(void* fileObject, char* buffer, uint32_t bytesToRead, uint32_t* bytesReaded);
-extern LC_FileResult_t lcfwrite(void* fileObject, const char* buffer, uint32_t bytesToWrite, uint32_t* bytesWritten);
-extern LC_FileResult_t lcfclose(void* fileObject);
-extern LC_FileResult_t lcftruncate(void* fileObject);
-extern uint32_t lcfsize(void* fileObject);
-
-extern void __attribute__((weak, alias("lc_fileserver_onreceive")))
-LC_FileServerOnReceive(void);
-
 //private functions
-void lc_fileserver_onreceive(void);
 fSrvObj* findFile(uint8_t source);
 LC_FileResult_t sendAck(uint32_t position, uint16_t error, void* sender, uint8_t node);
 LC_FileResult_t deleteFSObject(fSrvObj* obj);
@@ -117,7 +104,7 @@ void proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data
 		//add to fifo
 		gotfifo = 1;
 	}
-		break;
+				  break;
 	case fOpRead: {
 		fOpRead_t* fop = data;
 		fsinput->Position = fop->Position;
@@ -126,7 +113,7 @@ void proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data
 		//add to fifo
 		gotfifo = 1;
 	}
-		break;
+				  break;
 	case fOpTruncate:
 	case fOpAckSize:
 	case fOpClose: {
@@ -136,7 +123,7 @@ void proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data
 		//add to fifo
 		gotfifo = 1;
 	}
-		break;
+				   break;
 	case fOpLseek: {
 		if (size == sizeof(fOpLseek_t)) {
 			fOpLseek_t* fop = data;
@@ -147,49 +134,62 @@ void proceedFileServer(LC_NodeDescriptor_t* node, LC_Header_t header, void* data
 			gotfifo = 1;
 		}
 	}
-		break;
+				   break;
 	case fOpData: {
 		fOpData_t* fop = data;
 		//fill data
 		fsinput->Size = fop->TotalBytes;
 		fsinput->Position = fop->Position;
 		//check data size
-		if (size == (int32_t) (fop->TotalBytes + sizeof(fOpData_t))) {
+		if (size == (int32_t)(fop->TotalBytes + sizeof(fOpData_t))) {
 			//copy data to new buffer
 			char* data_write = lcmalloc(fop->TotalBytes);
 			if (data_write)
 				memcpy(data_write, &fop->Data[0], fop->TotalBytes);
 			fsinput->Data = data_write;
-		} else {
+		}
+		else {
 			fsinput->Data = 0;
 			fsinput->Size = 0;
 		}
 		//add to fifo
 		gotfifo = 1;
 	}
-		break;
+				  break;
 	}
 	if (gotfifo) {
 		fsinput->Operation = *op;
 		fsinput->NodeID = header.Source;
 		fsFIFO_in = (fsFIFO_in + 1) % LEVCAN_MAX_TABLE_NODES;
 		//send request to process messages.
+		//make your own implementation of LC_FileServerOnReceive to use semaphore for main file process
+		//this should speed-up communication
 		LC_FileServerOnReceive();
 	}
 }
 
-void lc_fileserver_onreceive(void) {
-//dummy function.
-//make your own implementation of LC_FileServerOnReceive to use semaphore for main file process
-//this should speed-up communication
+//default ack
+const fOpAck_t fask_open_many = { .Operation = fOpAck,.Position = 0,.Error = LC_FR_TooManyOpenFiles };
+const fOpAck_t fask_mem_out = { .Operation = fOpAck,.Position = 0,.Error = LC_FR_MemoryFull };
+const fOpAck_t fask_deni = { .Operation = fOpAck,.Position = 0,.Error = LC_FR_Denied };
+
+LC_Return_t LC_FileServerInit(LC_NodeDescriptor_t* node) {
+	//File server
+	LC_Object_t* initObject = lc_registerSystemObjects(node, 1);
+	if (initObject == 0)
+		return LC_InitError;
+	initObject->Address = proceedFileServer;
+	initObject->Attributes.Writable = 1;
+	initObject->Attributes.Function = 1;
+	initObject->Attributes.TCP = 1;
+	initObject->MsgID = LC_SYS_FileClient;//get client requests
+	initObject->Size = INT32_MIN;//anysize
+
+	node->ShortName.FileServer = 1;
+	return LC_Ok;
 }
 
-//default ack
-const fOpAck_t fask_open_many = { .Operation = fOpAck, .Position = 0, .Error = LC_FR_TooManyOpenFiles };
-const fOpAck_t fask_mem_out = { .Operation = fOpAck, .Position = 0, .Error = LC_FR_MemoryFull };
-const fOpAck_t fask_deni = { .Operation = fOpAck, .Position = 0, .Error = LC_FR_Denied };
-
-void LC_FileServer(uint32_t tick, void* server) {
+void LC_FileServer(LC_NodeDescriptor_t* node, uint32_t tick, void* server) {
 	if (initFS == 0) {
 		fsFIFO_in = 0;
 		fsFIFO_out = 0;
@@ -215,7 +215,8 @@ void LC_FileServer(uint32_t tick, void* server) {
 				fsinput->Data = 0;
 				//already opened file
 				sendAck(0, LC_FR_TooManyOpenFiles, server, fsinput->NodeID);
-			} else {
+			}
+			else {
 				void* file;
 				LC_FileResult_t res = lcfopen(&file, fsinput->Data, fsinput->Mode);
 				//free name
@@ -243,11 +244,12 @@ void LC_FileServer(uint32_t tick, void* server) {
 						fileNode->Next = 0;
 						file_start = fileNode;
 						file_end = fileNode;
-					} else {
+					}
+					else {
 						//add to the end
-						fileNode->Previous = (intptr_t*) file_end;
+						fileNode->Previous = (intptr_t*)file_end;
 						fileNode->Next = 0;
-						file_end->Next = (intptr_t*) fileNode;
+						file_end->Next = (intptr_t*)fileNode;
 						file_end = fileNode;
 					}
 					//done!
@@ -257,7 +259,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 				sendAck(0, res, server, fsinput->NodeID);
 			}
 		}
-			break;
+					  break;
 		case fOpRead: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened/created file for this node?
@@ -297,11 +299,12 @@ void LC_FileServer(uint32_t tick, void* server) {
 
 				if (LC_SendMessage(server, &rec, LC_SYS_FileServer))
 					lcfree(buffer);
-			} else {
+			}
+			else {
 				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
 			}
 		}
-			break;
+					  break;
 		case fOpData: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened/created file for this node?
@@ -310,9 +313,11 @@ void LC_FileServer(uint32_t tick, void* server) {
 
 				if (fsinput->Size == 0) {
 					sendAck(0, LC_FR_NetworkError, server, fsinput->NodeID);
-				} else if (fsinput->Data == 0) {
+				}
+				else if (fsinput->Data == 0) {
 					sendAck(0, LC_FR_MemoryFull, server, fsinput->NodeID);
-				} else {
+				}
+				else {
 					//get current position
 					uint32_t filepos = lcftell(fileNode->FileObject);
 					LC_FileResult_t result = 0;
@@ -324,7 +329,8 @@ void LC_FileServer(uint32_t tick, void* server) {
 					if (result) {
 						//error happened
 						sendAck(0, result, server, fsinput->NodeID);
-					} else {
+					}
+					else {
 						uint32_t btw = fsinput->Size;
 						if (fsinput->Position != filepos)
 							btw = 0; //pointer not moved
@@ -333,25 +339,27 @@ void LC_FileServer(uint32_t tick, void* server) {
 						sendAck(btw, result, server, fsinput->NodeID);
 					}
 				}
-			} else {
+			}
+			else {
 				sendAck(0, LC_FR_FileNotOpened, server, fsinput->NodeID);
 			}
 			//free data
 			if (fsinput->Data)
 				lcfree(fsinput->Data);
 		}
-			break;
+					  break;
 		case fOpClose: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Ok;
 			if (fileNode) {
 				rslt = deleteFSObject(fileNode);
-			} else
+			}
+			else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(0, rslt, server, fsinput->NodeID);
 		}
-			break;
+					   break;
 		case fOpLseek: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
@@ -360,11 +368,12 @@ void LC_FileServer(uint32_t tick, void* server) {
 			if (fileNode) {
 				rslt = lcflseek(fileNode->FileObject, fsinput->Position);
 				filepos = lcftell(fileNode->FileObject);
-			} else
+			}
+			else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(filepos, rslt, server, fsinput->NodeID);
 		}
-			break;
+					   break;
 		case fOpAckSize: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
@@ -372,22 +381,24 @@ void LC_FileServer(uint32_t tick, void* server) {
 			uint32_t filesize = 0;
 			if (fileNode) {
 				filesize = lcfsize(fileNode->FileObject);
-			} else
+			}
+			else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(filesize, rslt, server, fsinput->NodeID);
 		}
-			break;
+						 break;
 		case fOpTruncate: {
 			fSrvObj* fileNode = findFile(fsinput->NodeID);
 			//do we have opened file for this node?
 			LC_FileResult_t rslt = LC_FR_Ok;
 			if (fileNode) {
 				rslt = lcftruncate(fileNode->FileObject);
-			} else
+			}
+			else
 				rslt = LC_FR_FileNotOpened;
 			sendAck(0, rslt, server, fsinput->NodeID);
 		}
-			break;
+						  break;
 		}
 	}
 	static uint16_t timesec = 0;
@@ -396,7 +407,7 @@ void LC_FileServer(uint32_t tick, void* server) {
 		timesec -= 1000;
 		fSrvObj* next;
 		for (fSrvObj* obj = (fSrvObj*)file_start; obj != 0; obj = next) {
-			next = (fSrvObj*) obj->Next;
+			next = (fSrvObj*)obj->Next;
 			obj->Timeout++;
 			//5 minute delete
 			if (obj->Timeout > 60 * 5)
@@ -458,39 +469,40 @@ fSrvObj* findFile(uint8_t source) {
 		if (obj->NodeID == source) {
 			return obj;
 		}
-		obj = (fSrvObj*) obj->Next;
+		obj = (fSrvObj*)obj->Next;
 	}
 	return 0;
 }
 
 LC_FileResult_t deleteFSObject(fSrvObj* obj) {
 	if (obj->Previous)
-		((fSrvObj*) obj->Previous)->Next = obj->Next; //junction
+		((fSrvObj*)obj->Previous)->Next = obj->Next; //junction
 	else {
 #ifdef LEVCAN_TRACE
 		if (file_start != obj) {
 			trace_printf("Start object error\n");
 		}
 #endif
-		file_start = (fSrvObj*) obj->Next; //Starting
+		file_start = (fSrvObj*)obj->Next; //Starting
 		if (file_start != 0)
 			file_start->Previous = 0;
 	}
 	if (obj->Next) {
-		((fSrvObj*) obj->Next)->Previous = obj->Previous;
-	} else {
+		((fSrvObj*)obj->Next)->Previous = obj->Previous;
+	}
+	else {
 #ifdef LEVCAN_TRACE
 		if (file_end != obj) {
 			trace_printf("End object error\n");
 		}
 #endif
-		file_end = (fSrvObj*) obj->Previous; //ending
+		file_end = (fSrvObj*)obj->Previous; //ending
 		if (file_end != 0)
 			file_end->Next = 0;
 	}
 
 	LC_FileResult_t resul = lcfclose(obj->FileObject);
-//free this object
+	//free this object
 	lcfree(obj);
 	return resul;
 }

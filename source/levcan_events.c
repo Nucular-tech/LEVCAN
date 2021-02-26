@@ -32,6 +32,7 @@
 #include <math.h>
 
 #include "levcan_events.h"
+#include "levcan_internal.h"
 #ifndef LC_EVENT_SIZE
 #define LC_EVENT_SIZE 256
 #endif
@@ -46,7 +47,21 @@ typedef struct {
 volatile uint8_t lc_eventButtonPressed = LC_EB_None;
 char lc_event_buffer[LC_EVENT_SIZE];
 
-LC_EventResult_t LC_EventSend(const char *text, const char *caption, LC_EventButtons_t buttons, uint8_t receiver) {
+LC_Return_t LC_EventInit(LC_NodeDescriptor_t *node) {
+	//Event response
+	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
+	if (node == 0 || node->Extensions == 0 || initObject == 0)
+		return LC_InitError;
+
+	initObject->Address = (void*) &lc_eventButtonPressed;
+	initObject->Attributes.Writable = 1;
+	initObject->MsgID = LC_SYS_Events;
+	initObject->Size = sizeof(lc_eventButtonPressed);
+
+	return LC_Ok;
+}
+
+LC_EventResult_t LC_EventSend(LC_NodeDescriptor_t *node, const char *text, const char *caption, LC_EventButtons_t buttons, uint8_t receiver) {
 	if (text == 0 || receiver > LC_Broadcast_Address)
 		return LC_ER_None;
 
@@ -60,7 +75,7 @@ LC_EventResult_t LC_EventSend(const char *text, const char *caption, LC_EventBut
 		caps = UINT8_MAX;
 	//find any event receiver
 	if (receiver >= LC_Null_Address)
-		receiver = LC_FindEventServer(0).NodeID;
+		receiver = LC_FindEventServer(node, 0).NodeID;
 
 	uint16_t buffersize = texts + caps + sizeof(eventSend_t);
 	if (buffersize > LC_EVENT_SIZE)
@@ -79,15 +94,15 @@ LC_EventResult_t LC_EventSend(const char *text, const char *caption, LC_EventBut
 	rec.Attributes.TCP = 1;
 	rec.Attributes.Priority = LC_Priority_Low;
 	rec.NodeID = receiver;
-	LC_SendMessage(0, &rec, LC_SYS_Events);
+	LC_SendMessage(node, &rec, LC_SYS_Events);
 
 	return lc_eventButtonPressed;
 }
 
-void LC_EventReset(uint8_t receiver) {
+void LC_EventReset(LC_NodeDescriptor_t* node, uint8_t receiver) {
 	if (receiver != LC_Null_Address) {
 		if (receiver >= LC_Null_Address)
-			receiver = LC_FindEventServer(0).NodeID;
+			receiver = LC_FindEventServer(node, 0).NodeID;
 
 		LC_ObjectRecord_t rec = { 0 };
 		rec.Address = 0;
@@ -95,27 +110,27 @@ void LC_EventReset(uint8_t receiver) {
 		rec.Attributes.TCP = 1;
 		rec.Attributes.Priority = LC_Priority_Low;
 		rec.NodeID = receiver;
-		LC_SendMessage(0, &rec, LC_SYS_Events);
+		LC_SendMessage(node, &rec, LC_SYS_Events);
 	}
 	lc_eventButtonPressed = LC_EB_None;
 }
 /// Returns event server short name
 /// @param scnt Pointer to stored position for search, can be null
 /// @return LC_NodeShortName_t file server
-LC_NodeShortName_t LC_FindEventServer(uint16_t *scnt) {
+LC_NodeShortName_t LC_FindEventServer(LC_NodeDescriptor_t *node, uint16_t *scnt) {
 	uint16_t counter = 0;
-	LC_NodeShortName_t node;
+	LC_NodeShortName_t nodeSN;
 	if (scnt)
 		counter = *scnt;
 	do {
-		node = LC_GetActiveNodes(&counter);
-		if (node.Events)
+		nodeSN = LC_GetActiveNodes(node, &counter);
+		if (nodeSN.Events)
 			break;
-	} while (node.NodeID != LC_Broadcast_Address);
+	} while (nodeSN.NodeID != LC_Broadcast_Address);
 
 	if (scnt)
 		*scnt = counter;
-	return node;
+	return nodeSN;
 }
 
 #ifndef LEVCAN_MEM_STATIC

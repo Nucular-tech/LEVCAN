@@ -76,3 +76,5 @@ typedef struct {
 
 #define directory(_directory, _arrayIndex, _AccessLvl, _Name  ) \
 	{ _directory, _Name, ARRAYSIZ(_directory), _arrayIndex, _AccessLvl }
+
+LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node);

@@ -23,8 +23,9 @@
 
 #pragma once
 
-void LC_AddressManager(uint32_t time);
-void LC_ConfigureFilters(void);
+LC_Return_t LC_AddressInit(LC_NodeDescriptor_t* node);
+void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time);
+void LC_ConfigureFilters(LC_NodeDescriptor_t* node);
 
 typedef enum {
 	LC_AdressNothing,

@@ -22,6 +22,7 @@
  ******************************************************************************/
 
 #include "levcan.h"
+#include "levcan_internal.h"
 #include "levcan_paramclient.h"
 #include "levcan_paraminternal.h"
 #include <string.h>
@@ -33,52 +34,52 @@
 #error "Can't use static memory for parameters client. Undefine LEVCAN_MEM_STATIC"
 #endif
 
-void *paramQueue[LEVCAN_MAX_OWN_NODES] = { 0 };
-//LC_Object_t *obj[LEVCAN_MAX_OWN_NODES] = { 0 };
-LC_ObjectRecord_t objRec[LEVCAN_MAX_OWN_NODES] = { 0 };
-
 #define OBJ_PARAM_SIZE (LC_SYS_ParametersValue - LC_SYS_ParametersData + 1)
 
-extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
-static void clearQueueAndInit(uint8_t id, uint8_t from_node, void* queue);
-static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, void *outData, uint16_t dataSize, uint16_t command);
+static void clearQueueAndInit(LC_NodeDescriptor_t *node, uint8_t from_node);
+static LC_Return_t requestData(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, void *outData, uint16_t dataSize, uint16_t command);
 
-LC_Return_t lcp_clientInit(LC_NodeDescriptor_t *node, uint8_t nodeIndex) {
-	paramQueue[nodeIndex] = LC_QueueCreate(5, sizeof(LC_ObjectData_t));
+LC_Return_t LCP_ParameterClientInit(LC_NodeDescriptor_t *node) {
 	LC_Object_t *initObject = lc_registerSystemObjects(node, OBJ_PARAM_SIZE);
-	if (initObject == 0 || paramQueue[nodeIndex] == 0) {
+	LC_ObjectRecord_t objRec = { 0 };
+	if (initObject == 0) {
 		return LC_MallocFail;
 	}
-	//obj[nodeIndex] = initObject;
+	intptr_t* clientQueue = LC_QueueCreate(5, sizeof(LC_ObjectData_t));
+	if (clientQueue == 0) {
+		return LC_MallocFail;
+	}
 	//prepare specific record, we need to strictly sort out other messages form senders
-	//objRec[nodeIndex].Address = 0;
-	objRec[nodeIndex].Attributes.Queue = 1;
-	objRec[nodeIndex].Attributes.Writable = 1;
-	objRec[nodeIndex].Size = -(LEVCAN_PARAM_MAX_TEXTSIZE + LEVCAN_PARAM_MAX_NAMESIZE);
+	objRec.Attributes.Queue = 1;
+	objRec.Attributes.Writable = 1;
+	objRec.Size = -(LEVCAN_PARAM_MAX_TEXTSIZE + LEVCAN_PARAM_MAX_NAMESIZE);
 	//dont place address here atm, we dont need junk
-	objRec[nodeIndex].NodeID = LC_Invalid_Address;
+	objRec.NodeID = LC_Invalid_Address;
+	//assign objRec to the node
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord = objRec;
 	//objects needed to define message ID and store objRecord
 	int objID = 0;
 	for (; objID < OBJ_PARAM_SIZE; objID++) {
 		initObject[objID].Attributes.Record = 1;
-		initObject[objID].Address = &objRec[nodeIndex];
+		initObject[objID].Address = &(((lc_Extensions_t*)node->Extensions)->paramClientRecord);
 		initObject[objID].MsgID = LC_SYS_ParametersData + objID;
 		initObject[objID].Size = 1;
 	}
+	((lc_Extensions_t*)node->Extensions)->paramClientQueue = clientQueue;
 	return LC_Ok;
 }
 
-LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry) {
+LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry) {
 
 	memset(out_entry, 0, sizeof(out_entry));
-	return requestData(mynode, from_node, directory_index, entry_index, out_entry, sizeof(out_entry), lcp_reqFullEntry);
+	return requestData(node, from_node, directory_index, entry_index, out_entry, sizeof(out_entry), lcp_reqFullEntry);
 }
 
 
-LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory) {
+LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory) {
 
 	memset(out_directory, 0, sizeof(out_directory));
-	return requestData(mynode, from_node, directory_index, 0, out_directory, sizeof(out_directory), lcp_reqDirectoryInfo);
+	return requestData(node, from_node, directory_index, 0, out_directory, sizeof(out_directory), lcp_reqDirectoryInfo);
 
 	/*
 	LC_Return_t result = LC_Ok;
@@ -107,11 +108,11 @@ LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *mynode, uint8_t from_node,
 	return result;*/
 }
 
-LC_Return_t LCP_RequestValue(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, intptr_t *outVariable, uint16_t varSize) {
-	return requestData(mynode, from_node, directory_index, entry_index, outVariable, varSize, lcp_reqVariable);
+LC_Return_t LCP_RequestValue(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, intptr_t *outVariable, uint16_t varSize) {
+	return requestData(node, from_node, directory_index, entry_index, outVariable, varSize, lcp_reqVariable);
 }
 
-static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, void *outData, uint16_t dataSize, uint16_t command) {
+static LC_Return_t requestData(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, void *outData, uint16_t dataSize, uint16_t command) {
 	LC_ObjectRecord_t sendReq = { .NodeID = from_node,.Attributes.Priority = LC_Priority_Low,.Attributes.TCP = 1 };
 	lc_request_entry_t request = { 0 };
 	lc_entry_data_t entrydata = { 0 }; //toBeCleaned
@@ -121,15 +122,14 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, u
 	LCPC_Entry_t bufferEntry = { 0 };
 	LCPC_Directory_t bufferDir = { 0 };
 
-	int id = LC_GetMyNodeIndex(mynode);
-	if (id < 0) {
-		return LC_NodeOffline;
+	if (node == 0 || node->Extensions == 0 || ((lc_Extensions_t*)node->Extensions)->paramClientQueue == 0) {
+		return LC_InitError;
 	}
 	if (from_node >= LC_Null_Address || outData == 0 || dataSize == 0) {
 		return LC_DataError;
 	}
 
-	intptr_t *queue = paramQueue[id];
+	intptr_t *queue = ((lc_Extensions_t*)node->Extensions)->paramClientQueue;
 	LC_ObjectData_t objData;
 	//clean
 	bufferEntry.Mode = LCP_Invalid;
@@ -147,9 +147,9 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, u
 		sendReq.Size = sizeof(request);
 	}
 	//prepare receive
-	clearQueueAndInit(id, from_node, queue);
+	clearQueueAndInit(node, from_node);
 	//send request!
-	LC_SendMessage(mynode, &sendReq, LC_SYS_ParametersRequest);
+	LC_SendMessage(node, &sendReq, LC_SYS_ParametersRequest);
 	lcp_reqCommand_t sequence = command;
 	if (command == lcp_reqDirectoryInfo) {
 		//directory doesnt needs so much
@@ -255,7 +255,7 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, u
 				//directory doesnt needs so much
 				sequence = lcp_reqName | lcp_reqData;
 			}
-			LC_SendMessage(mynode, &sendReq, LC_SYS_ParametersRequest);
+			LC_SendMessage(node, &sendReq, LC_SYS_ParametersRequest);
 			if (attempt > 2) {
 				error.ErrorCode = LC_Timeout;
 			}
@@ -266,8 +266,8 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, u
 	}
 
 	//stop receive
-	objRec[id].NodeID = LC_Invalid_Address;
-	objRec[id].Address = 0;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.NodeID = LC_Invalid_Address;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.Address = 0;
 	LC_Return_t result = LC_Ok;
 
 	if (error.ErrorCode) {
@@ -313,7 +313,7 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *mynode, uint8_t from_node, u
 	return result;
 }
 
-LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint16_t directory_index, uint16_t entry_index, intptr_t *value, uint16_t valueSize) {
+LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *node, uint8_t remote_node, uint16_t directory_index, uint16_t entry_index, intptr_t *value, uint16_t valueSize) {
 	LC_ObjectRecord_t sendReq = { .NodeID = remote_node,.Attributes.Priority = LC_Priority_Low,.Attributes.TCP = 1 };
 	uint32_t sizeValSet = sizeof(lc_value_set_t) + valueSize;
 	lc_value_set_t* valSet = lcmalloc(sizeValSet);
@@ -322,16 +322,15 @@ LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint1
 	if (value == 0 || valueSize > LEVCAN_PARAM_MAX_TEXTSIZE + LEVCAN_PARAM_MAX_NAMESIZE)
 		return LC_DataError;
 
-	int id = LC_GetMyNodeIndex(mynode);
-	if (id < 0) {
-		return LC_NodeOffline;
+	if (node == 0 || node->Extensions == 0 || ((lc_Extensions_t*)node->Extensions)->paramClientQueue == 0) {
+		return LC_InitError;
 	}
-	if (remote_node >= LC_Null_Address) {
+	if (remote_node >= LC_Null_Address || value == 0 || valueSize == 0) {
 		return LC_DataError;
 	}
 
 	LC_Return_t state = LC_Ok;
-	intptr_t *queue = paramQueue[id];
+	intptr_t *queue = ((lc_Extensions_t*)node->Extensions)->paramClientQueue;
 	//copy
 	valSet->Command = lcp_reqValueSet;
 	valSet->DirectoryIndex = directory_index;
@@ -342,8 +341,8 @@ LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint1
 	sendReq.Size = sizeValSet;
 	sendReq.Attributes.Cleanup = 1; //free call
 	//prepare receive
-	clearQueueAndInit(id, remote_node, queue);
-	if (LC_SendMessage(mynode, &sendReq, LC_SYS_ParametersRequest) == LC_Ok) {
+	clearQueueAndInit(node, remote_node);
+	if (LC_SendMessage(node, &sendReq, LC_SYS_ParametersRequest) == LC_Ok) {
 		LC_ObjectData_t objData;
 		int result = LC_QueueReceive(queue, &objData, 500);
 		if (result) {
@@ -357,8 +356,8 @@ LC_Return_t LCP_SetValue(LC_NodeDescriptor_t *mynode, uint8_t remote_node, uint1
 		}
 	}
 	//stop receive
-	objRec[id].NodeID = LC_Invalid_Address;
-	objRec[id].Address = 0;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.NodeID = LC_Invalid_Address;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.Address = 0;
 	return state;
 }
 
@@ -389,11 +388,12 @@ void LCP_CleanDirectory(LCPC_Directory_t *dir) {
 	}
 }
 
-static void clearQueueAndInit(uint8_t id, uint8_t from_node, void* queue) {
+static void clearQueueAndInit(LC_NodeDescriptor_t *node, uint8_t from_node) {
 	LC_ObjectData_t temp;
+	void* queue = ((lc_Extensions_t*)node->Extensions)->paramClientQueue;
 	//prepare receive
-	objRec[id].NodeID = from_node;
-	objRec[id].Address = queue;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.NodeID = from_node;
+	((lc_Extensions_t*)node->Extensions)->paramClientRecord.Address = queue;
 	//request!	
 	for (int result = 0; result = LC_QueueReceive(queue, &temp, 0);) {
 		lcfree(temp.Data);

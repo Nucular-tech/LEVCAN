@@ -1,17 +1,17 @@
 /*******************************************************************************
  * LEVCAN: Light Electric Vehicle CAN protocol [LC]
  * Copyright (C) 2020 Vasiliy Sukhoparov
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -22,7 +22,7 @@
  ******************************************************************************/
 
 #include "stdint.h"
-/* Application specific configuration options. */
+ /* Application specific configuration options. */
 #include "levcan_config.h"
 
 #pragma once
@@ -30,19 +30,19 @@
 typedef union {
 	uint16_t Attributes;
 	struct {
-		uint16_t Readable :1;	//Nodes can read from the variable
-		uint16_t Writable :1;	//Nodes may write to the variable
-		uint16_t TCP :1;		//Node should control packets sent (RTS/CTS) and create special tx/rx buffer
-		uint16_t Priority :2;
-		uint16_t Record :1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
-		uint16_t Function :1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
+		uint16_t Readable : 1;	//Nodes can read from the variable
+		uint16_t Writable : 1;	//Nodes may write to the variable
+		uint16_t TCP : 1;		//Node should control packets sent (RTS/CTS) and create special tx/rx buffer
+		uint16_t Priority : 2;
+		uint16_t Record : 1;		//Object remapped to record array LC_ObjectRecord_t[Size],were LC_Object_t.Size will define array size
+		uint16_t Function : 1;	//Functional call LC_FunctionCall_t, memory pointer will be cleared after call
 		//received data will be saved as pointer to memory area, if there is already exists, it will be free
-		uint16_t Pointer :1;	//TX - data taken from pointer (where Address is pointer to pointer)
-		uint16_t Cleanup :1;	//after transmission pointer will call memfree
+		uint16_t Pointer : 1;	//TX - data taken from pointer (where Address is pointer to pointer)
+		uint16_t Cleanup : 1;	//after transmission pointer will call memfree
 #ifdef LEVCAN_USE_RTOS_QUEUE
-		uint16_t Queue :1;		//will place data on specified queue (address should have queue pointer)
+		uint16_t Queue : 1;		//will place data on specified queue (address should have queue pointer)
 #endif
-	} LEVCAN_PACKED;
+	} ;
 } LC_ObjectAttributes_t;
 
 typedef struct {
@@ -66,11 +66,11 @@ typedef struct {
 	union {
 		uint16_t ControlBits;
 		struct {
-			uint16_t EoM :1;
-			uint16_t Parity :1;
-			uint16_t RTS_CTS :1;
-			uint16_t Priority :2;
-			uint16_t Request :1;
+			uint16_t EoM : 1;
+			uint16_t Parity : 1;
+			uint16_t RTS_CTS : 1;
+			uint16_t Priority : 2;
+			uint16_t Request : 1;
 		};
 	};
 } LC_Header_t;
@@ -79,16 +79,16 @@ typedef union {
 	uint32_t ToUint32;
 	struct {
 		//index 29bit:
-		uint32_t Source :7;
-		uint32_t Target :7;
-		uint32_t MsgID :10;
-		uint32_t EoM :1;
-		uint32_t Parity :1;
-		uint32_t RTS_CTS :1;
-		uint32_t Priority :2;
+		uint32_t Source : 7;
+		uint32_t Target : 7;
+		uint32_t MsgID : 10;
+		uint32_t EoM : 1;
+		uint32_t Parity : 1;
+		uint32_t RTS_CTS : 1;
+		uint32_t Priority : 2;
 		//RTR bit:
-		uint32_t Request :1;
-	} LEVCAN_PACKED;
+		uint32_t Request : 1;
+	} ;
 } LC_HeaderPacked_t;
 
 typedef struct {
@@ -101,18 +101,18 @@ typedef struct {
 	union {
 		uint32_t ToUint32[2];
 		struct {
-			uint32_t Configurable :1; 	//0
-			uint32_t Variables :1; 		//1
-			uint32_t SWUpdates :1; 		//2
-			uint32_t Events :1; 		//3
-			uint32_t FileServer :1;		//4
-			uint32_t CodePage :16;		//5-20 https://docs.microsoft.com/en-us/dotnet/api/system.text.encoding?view=netcore-3.1
-			uint32_t reserved1 :(32 - 5 - 16 - 1);		//21-30
-			uint32_t DynamicID :1;		//31
+			uint32_t Configurable : 1; 	//0
+			uint32_t Variables : 1; 		//1
+			uint32_t SWUpdates : 1; 		//2
+			uint32_t Events : 1; 		//3
+			uint32_t FileServer : 1;		//4
+			uint32_t CodePage : 16;		//5-20 https://docs.microsoft.com/en-us/dotnet/api/system.text.encoding?view=netcore-3.1
+			uint32_t reserved1 : (32 - 5 - 16 - 1);		//21-30
+			uint32_t DynamicID : 1;		//31
 			//32b align
-			uint32_t DeviceType :10;	//32-41
-			uint32_t ManufacturerCode :10;	//42-51
-			uint32_t SerialNumber :12;	//52-63
+			uint32_t DeviceType : 10;	//32-41
+			uint32_t ManufacturerCode : 10;	//42-51
+			uint32_t SerialNumber : 12;	//52-63
 		};
 	};
 	uint16_t NodeID;
@@ -147,41 +147,21 @@ enum {
 	LC_SYS_End,
 };
 
+#ifndef LEVCAN_SYS_OBJ_SIZ
+#define LEVCAN_SYS_OBJ_SIZ (LC_SYS_End - LC_SYS_NodeName)
+#endif
+
 enum {
 	LCNodeState_Disabled, LCNodeState_NetworkDiscovery, LCNodeState_WaitingClaim, LCNodeState_Online
 };
 
-typedef struct {
-	char *NodeName;
-	char *DeviceName;
-	char *VendorName;
-	uint32_t Serial;
-	LC_NodeShortName_t ShortName;
-	uint32_t LastTXtime;
-	uint16_t LastID;
-	uint8_t State;
-	uint8_t AccessLevel;
-	LC_Object_t *Objects;
-	LC_Object_t *SystemObjects;
-	void *Directories;
-	uint16_t ObjectsSize;
-	uint16_t SystemSize;
-	uint16_t DirectoriesSize;
-} LC_NodeDescriptor_t;
-
-typedef struct {
-	LC_NodeShortName_t ShortName;
-	uint32_t LastRXtime;
-} LC_NodeTable_t;
-
-typedef void (*LC_FunctionCall_t)(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 
 typedef enum {
 	LC_Priority_Low, LC_Priority_Mid, LC_Priority_Control, LC_Priority_High,
 } LC_Priority_t;
 
 typedef enum {
-	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout, LC_OutOfRange, LC_AccessError
+	LC_Ok, LC_DataError, LC_ObjectError, LC_BufferFull, LC_BufferEmpty, LC_NodeOffline, LC_MallocFail, LC_Collision, LC_Timeout, LC_OutOfRange, LC_AccessError, LC_InitError
 } LC_Return_t;
 
 typedef enum {
@@ -196,25 +176,92 @@ enum {
 	LC_RX, LC_TX, LC_NodeFreeIDmin = 64, LC_NodeFreeIDmax = 125
 };
 
-LC_EXPORT LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t **node);
+
+typedef LC_Return_t(*HAL_Send_t)(LC_HeaderPacked_t header, uint32_t* data, uint8_t length);
+typedef LC_Return_t(*HAL_Filter_t)(LC_HeaderPacked_t* reg, LC_HeaderPacked_t* mask, uint16_t count);
+
+typedef struct {
+	HAL_Send_t Send;
+	HAL_Filter_t Filter;
+} LC_DriverCalls_t;
+
+typedef struct {
+	LC_NodeShortName_t ShortName;
+	uint32_t LastRXtime;
+} LC_NodeTableEntry_t;
+
+typedef struct {
+	LC_NodeTableEntry_t* Table;
+	uint16_t TableSize;
+	//uint16_t FreeSlots;
+} LC_NodeTable_t;
+
+typedef struct {
+	const void* Driver;
+	const char *NodeName;
+	const char *DeviceName;
+	const char *VendorName;
+	LC_Object_t *Objects;
+	void *Directories;
+	LC_NodeShortName_t ShortName;
+	uint32_t Serial[4];
+	uint32_t LastTXtime;
+	uint16_t ObjectsSize;
+	uint16_t SystemSize;
+	uint16_t DirectoriesSize;
+	uint16_t LastID;
+	uint8_t State;
+	uint8_t AccessLevel;
+	//not for public use
+	struct {
+#ifdef LEVCAN_STATIC_MEM
+		objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
+		int16_t objectBuffer_freeID;
+#endif
+#ifdef LEVCAN_USE_RTOS_QUEUE
+#ifndef LEVCAN_NO_TX_QUEUE
+		void *txQueue;
+		void *txSemph;
+#endif
+		void *rxQueue;
+#else
+#ifndef LEVCAN_NO_TX_QUEUE
+		msgBuffered txFIFO[LEVCAN_TX_SIZE];
+		volatile uint16_t txFIFO_in, txFIFO_out;
+#endif
+		msgBuffered rxFIFO[LEVCAN_RX_SIZE];
+		volatile uint16_t rxFIFO_in, rxFIFO_out;
+#endif
+		volatile void *objTXbuf_start;
+		volatile void *objTXbuf_end;
+		volatile void *objRXbuf_start;
+		volatile void *objRXbuf_end;
+	} TxRxObjects;
+	LC_NodeTable_t* NodeTable;
+	void* Extensions;
+	LC_Object_t SystemObjects[LEVCAN_SYS_OBJ_SIZ];
+} LC_NodeDescriptor_t;
+
+typedef void(*LC_FunctionCall_t)(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
+
+LC_EXPORT LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node);
 LC_EXPORT LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node);
 //Handlers should be called from CAN HAL ISR
-LC_EXPORT void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
-LC_EXPORT void LC_TransmitHandler(void);
+LC_EXPORT void LC_ReceiveHandler(LC_NodeDescriptor_t* node, LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 
 //Managers should be called from separate tasks, if LEVCAN_USE_RTOS_QUEUE set
-LC_EXPORT void LC_NetworkManager(uint32_t time); //low priority
-LC_EXPORT void LC_ReceiveManager(void); //high priority
-LC_EXPORT void LC_TransmitManager(void); //high priority
+LC_EXPORT void LC_NetworkManager(LC_NodeDescriptor_t* node, uint32_t time); //low priority
+LC_EXPORT void LC_ReceiveManager(LC_NodeDescriptor_t* node); //high priority
+LC_EXPORT void LC_TransmitManager(LC_NodeDescriptor_t* node); //high priority
 
-LC_EXPORT LC_Return_t LC_SendMessage(void *sender, LC_ObjectRecord_t *object, uint16_t index);
-LC_EXPORT LC_Return_t LC_SendRequest(void *sender, uint16_t target, uint16_t index);
-LC_EXPORT LC_Return_t LC_SendRequestSpec(void *sender, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
+LC_EXPORT LC_Return_t LC_SendMessage(LC_NodeDescriptor_t* node, LC_ObjectRecord_t *object, uint16_t index);
+LC_EXPORT LC_Return_t LC_SendRequest(LC_NodeDescriptor_t* node, uint16_t target, uint16_t index);
+LC_EXPORT LC_Return_t LC_SendRequestSpec(LC_NodeDescriptor_t* node, uint16_t target, uint16_t index, uint8_t size, uint8_t TCP);
 
-LC_EXPORT LC_NodeShortName_t LC_GetActiveNodes(uint16_t *last_pos);
-LC_EXPORT LC_NodeShortName_t LC_GetNode(uint16_t nodeID);
-LC_EXPORT LC_NodeShortName_t LC_GetMyNodeName(void *mynode);
-LC_EXPORT int16_t LC_GetMyNodeIndex(void *mynode);
+LC_EXPORT LC_NodeShortName_t LC_GetActiveNodes(LC_NodeDescriptor_t* node, uint16_t *last_pos);
+LC_EXPORT LC_NodeShortName_t LC_GetNode(LC_NodeDescriptor_t* node, uint16_t nodeID);
+LC_EXPORT LC_NodeShortName_t LC_GetMyNodeName(LC_NodeDescriptor_t* node);
 
 LC_EXPORT LC_HeaderPacked_t LC_HeaderPack(LC_Header_t header);
 LC_EXPORT LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header);
+LC_EXPORT size_t LC_SizeOfDescriptor();

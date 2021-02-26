@@ -29,8 +29,7 @@ static const char* extractEntryName(const LCPS_Directory_t directories[], uint16
 void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
 
-LC_Return_t lcp_hostInit(LC_NodeDescriptor_t *node, uint8_t nodeIndex) {
-	(void) nodeIndex;
+LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
 	//register function call to this object
 	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
 	if (initObject == 0) {
@@ -42,6 +41,7 @@ LC_Return_t lcp_hostInit(LC_NodeDescriptor_t *node, uint8_t nodeIndex) {
 	initObject->Attributes.TCP = 1;
 	initObject->MsgID = LC_SYS_ParametersRequest;
 	initObject->Size = -LEVCAN_FILE_DATASIZE; //up to size
+	node->ShortName.Configurable = 1;
 	return LC_Ok;
 }
 
