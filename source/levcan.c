@@ -127,18 +127,20 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 #ifndef LEVCAN_STATIC_MEM
 	//private variables for specific usage
 	node->Extensions = lcmalloc(sizeof(lc_Extensions_t));
-	if (node->Extensions == 0) {
+	//can be sizeof 0
+	if (sizeof(lc_Extensions_t) > 0 && node->Extensions == 0) {
 		return LC_MallocFail;
 	} else {
 		memset(node->Extensions, 0, sizeof(lc_Extensions_t));
 	}
 	//node table can be pre-defined (global)
 	node->NodeTable = lcmalloc(sizeof(LC_NodeTable_t));
-	if (node->Extensions == 0)
+	if (node->NodeTable == 0)
 		return LC_MallocFail;
 
 	node->NodeTable->Table = lcmalloc(sizeof(LC_NodeTableEntry_t[LEVCAN_MAX_TABLE_NODES]));
-	if (node->NodeTable->Table == 0)
+	//can be sizeof 0
+	if (sizeof(LC_NodeTableEntry_t[LEVCAN_MAX_TABLE_NODES]) > 0 && node->NodeTable->Table == 0)
 		return LC_MallocFail;
 	int i = 0;
 	for (i = 0; i < LEVCAN_MAX_TABLE_NODES; i++)
@@ -542,8 +544,7 @@ LC_Return_t lc_sendDataToQueue(LC_NodeDescriptor_t *node, LC_HeaderPacked_t hdr,
 		//todo length ignored, potential unaligned access?
 		msgTX.data[0] = data[0];
 		msgTX.data[1] = data[1];
-	}
-	else {
+	} else {
 		msgTX.data[0] = 0;
 		msgTX.data[1] = 0;
 	}
@@ -653,7 +654,7 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, objBuffered *object, LC_Head
 		//cycle if this is UDP till message end or buffer 3/4 fill
 	} while ((object->Flags.TCP == 0)
 #ifndef LEVCAN_NO_TX_QUEUE
-		&& (getTXqueueSize(node) * 4 < LEVCAN_TX_SIZE * 3)
+			&& (getTXqueueSize(node) * 4 < LEVCAN_TX_SIZE * 3)
 #endif
 			&& (object->Header.EoM == 0));
 	//in UDP mode delete object when EoM is set
@@ -874,7 +875,7 @@ LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID
 						//Group C
 								((record[irec].NodeID == LC_Broadcast_Address) || 			//any match == broadcast
 						(record[irec].NodeID == nodeID))) 							//specific node ID match
-						//@formatter:on
+											//@formatter:on
 					{
 						return record[irec];    //yes
 
@@ -1143,7 +1144,8 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 				}
 			} else {
 				//find existing RX object
-				objBuffered *RXobj = findObject((void*)node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target, rxBuffered.header.Source);
+				objBuffered *RXobj = findObject((void*) node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target,
+						rxBuffered.header.Source);
 				if (RXobj)
 					objectRXproceed(node, RXobj, &rxBuffered);
 			}
@@ -1151,7 +1153,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 	}
 }
 #ifndef LEVCAN_NO_TX_QUEUE
-void LC_TransmitManager(LC_NodeDescriptor_t* node){
+void LC_TransmitManager(LC_NodeDescriptor_t *node) {
 	//fill TX buffer till no empty slots
 	//Some thread safeness
 #ifdef LEVCAN_USE_RTOS_QUEUE
