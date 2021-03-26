@@ -20,22 +20,14 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  ******************************************************************************/
+#include <stdio.h>
+#include <inttypes.h>
+#include <string.h>
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
 #include "levcan_paramcommon.h"
 
-int32_t getInt32(intptr_t *variable, uint16_t varSize);
-void setInt32(intptr_t *variable, uint16_t varSize, int32_t value);
-LC_Return_t i32inRange(intptr_t *variable, uint16_t varSize, int32_t min, int32_t max);
-LC_Return_t i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, int64_t max);
-
-uint32_t getUint32(intptr_t *variable, uint16_t varSize);
-void setUint32(intptr_t *variable, uint16_t varSize, uint32_t value);
-LC_Return_t u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, uint32_t max);
-LC_Return_t u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint64_t max);
-
-LC_Return_t f32inRange(intptr_t *variable, uint16_t varSize, float min, float max);
-LC_Return_t d64inRange(intptr_t *variable, uint16_t varSize, double min, double max);
+uint32_t pow10i(uint8_t pow);
 
 LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type) {
 	if (variable == 0 || varSize == 0)
@@ -47,14 +39,14 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 	default:
 		return LC_Ok;
 	case LCP_Bool: //LCP_Bool_t
-		return u32inRange(variable, varSize, 0, 1);
+		return lcp_u32inRange(variable, varSize, 0, 1);
 		break;
 	case LCP_Enum: { //LCP_Enum_t
 		if (descSize != sizeof(LCP_Enum_t)) {
 			return LC_DataError;
 		}
 		const LCP_Enum_t *desc = (LCP_Enum_t*) descriptor;
-		return u32inRange(variable, varSize, desc->Min, desc->Min + desc->Size);
+		return lcp_u32inRange(variable, varSize, desc->Min, desc->Min + desc->Size);
 	}
 		break;
 	case LCP_Bitfield32: { //LCP_Bitfield32_t
@@ -62,10 +54,10 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return LC_DataError;
 		}
 		const LCP_Bitfield32_t *desc = (LCP_Bitfield32_t*) descriptor;
-		uint32_t value = getUint32(variable, varSize);
+		uint32_t value = lcp_getUint32(variable, varSize);
 		int outofrange = (~desc->Mask) & value;
 		value &= desc->Mask; //filter by mask
-		setUint32(variable, varSize, value);
+		lcp_setUint32(variable, varSize, value);
 		return outofrange ? LC_OutOfRange : LC_Ok;
 	}
 		break;
@@ -74,7 +66,7 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return LC_DataError;
 		}
 		const LCP_Int32_t *desc = (LCP_Int32_t*) descriptor;
-		return i32inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_i32inRange(variable, varSize, desc->Min, desc->Max);
 	}
 		break;
 	case LCP_Uint32: { //LCP_Uint32_t
@@ -82,15 +74,16 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return LC_DataError;
 		}
 		const LCP_Uint32_t *desc = (LCP_Uint32_t*) descriptor;
-		return u32inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_u32inRange(variable, varSize, desc->Min, desc->Max);
 	}
 		break;
+#ifdef LEVCAN_USE_INT64
 	case LCP_Int64: { //LCP_Int64_t
 		if (descSize != sizeof(LCP_Int64_t)) {
 			return LC_DataError;
 		}
 		const LCP_Int64_t *desc = (LCP_Int64_t*) descriptor;
-		return i64inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_i64inRange(variable, varSize, desc->Min, desc->Max);
 	}
 		break;
 	case LCP_Uint64: { //LCP_Uint64_t
@@ -98,16 +91,17 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return LC_DataError;
 		}
 		const LCP_Uint64_t *desc = (LCP_Uint64_t*) descriptor;
-		return u64inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_u64inRange(variable, varSize, desc->Min, desc->Max);
 	}
 		break;
+#endif
 #ifdef LEVCAN_USE_FLOAT
 	case LCP_Float: { //LCP_Float_t
 		if (descSize != sizeof(LCP_Float_t)) {
 			return LC_DataError;
 		}
 		const LCP_Float_t *desc = (LCP_Float_t*) descriptor;
-		return f32inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_f32inRange(variable, varSize, desc->Min, desc->Max);
 	}
 		break;
 #endif
@@ -117,7 +111,7 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return;
 		}
 		const LCP_Double_t *desc = (LCP_Double_t*)descriptor;
-		return d64inRange(variable, varSize, desc->Min, desc->Max);
+		return lcp_d64inRange(variable, varSize, desc->Min, desc->Max);
 	}
 	break;
 #endif
@@ -126,7 +120,7 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 	return LC_Ok;
 }
 
-LC_Return_t d64inRange(intptr_t *variable, uint16_t varSize, double min, double max) {
+LC_Return_t lcp_d64inRange(intptr_t *variable, uint16_t varSize, double min, double max) {
 	if (varSize != sizeof(double))
 		return LC_DataError;
 	double value = *(double*) variable;
@@ -143,7 +137,7 @@ LC_Return_t d64inRange(intptr_t *variable, uint16_t varSize, double min, double 
 	return outOfRange ? LC_OutOfRange : LC_Ok;
 }
 
-LC_Return_t f32inRange(intptr_t *variable, uint16_t varSize, float min, float max) {
+LC_Return_t lcp_f32inRange(intptr_t *variable, uint16_t varSize, float min, float max) {
 	if (varSize != sizeof(float))
 		return LC_DataError;
 	float value = *(float*) variable;
@@ -160,7 +154,8 @@ LC_Return_t f32inRange(intptr_t *variable, uint16_t varSize, float min, float ma
 	return outOfRange ? LC_OutOfRange : LC_Ok;
 }
 
-LC_Return_t i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, int64_t max) {
+#ifdef LEVCAN_USE_INT64
+LC_Return_t lcp_i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, int64_t max) {
 	if (varSize != sizeof(int64_t))
 		return LC_DataError;
 	int64_t value = *(int64_t*) variable;
@@ -177,7 +172,7 @@ LC_Return_t i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, int64_
 	return outOfRange ? LC_OutOfRange : LC_Ok;
 }
 
-LC_Return_t u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint64_t max) {
+LC_Return_t lcp_u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint64_t max) {
 	if (varSize != sizeof(uint64_t))
 		return LC_DataError;
 	uint64_t value = *(uint64_t*) variable;
@@ -193,38 +188,39 @@ LC_Return_t u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint6
 	*(uint64_t*) variable = value;
 	return outOfRange ? LC_OutOfRange : LC_Ok;
 }
+#endif
 
-LC_Return_t u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, uint32_t max) {
+LC_Return_t lcp_u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, uint32_t max) {
 	if (varSize > sizeof(uint32_t))
 		return LC_DataError;
-	uint32_t value = getUint32(variable, varSize);
+	uint32_t value = lcp_getUint32(variable, varSize);
 
 	if (value > max) {
-		setUint32(variable, varSize, max);
+		lcp_setUint32(variable, varSize, max);
 		return LC_OutOfRange;
 	} else if (value < min) {
-		setUint32(variable, varSize, min);
+		lcp_setUint32(variable, varSize, min);
 		return LC_OutOfRange;
 	}
 	return LC_Ok;
 }
 
-LC_Return_t i32inRange(intptr_t *variable, uint16_t varSize, int32_t min, int32_t max) {
+LC_Return_t lcp_i32inRange(intptr_t *variable, uint16_t varSize, int32_t min, int32_t max) {
 	if (varSize > sizeof(int32_t))
 		return LC_DataError;
-	int32_t value = getInt32(variable, varSize);
+	int32_t value = lcp_getInt32(variable, varSize);
 
 	if (value > max) {
-		setInt32(variable, varSize, max);
+		lcp_setInt32(variable, varSize, max);
 		return LC_OutOfRange;
 	} else if (value < min) {
-		setInt32(variable, varSize, min);
+		lcp_setInt32(variable, varSize, min);
 		return LC_OutOfRange;
 	}
 	return LC_Ok;
 }
 
-int32_t getInt32(intptr_t *variable, uint16_t varSize) {
+int32_t lcp_getInt32(intptr_t *variable, uint16_t varSize) {
 	switch (varSize) {
 	default:
 		return *(int8_t*) variable;
@@ -233,9 +229,10 @@ int32_t getInt32(intptr_t *variable, uint16_t varSize) {
 	case 4:
 		return *(int32_t*) variable;
 	}
+	return 0;
 }
 
-void setInt32(intptr_t *variable, uint16_t varSize, int32_t value) {
+void lcp_setInt32(intptr_t *variable, uint16_t varSize, int32_t value) {
 	switch (varSize) {
 	default:
 		*(int8_t*) variable = (int8_t) value;
@@ -249,7 +246,7 @@ void setInt32(intptr_t *variable, uint16_t varSize, int32_t value) {
 	}
 }
 
-uint32_t getUint32(intptr_t *variable, uint16_t varSize) {
+uint32_t lcp_getUint32(intptr_t *variable, uint16_t varSize) {
 	switch (varSize) {
 	default:
 		return *(uint8_t*) variable;
@@ -258,9 +255,10 @@ uint32_t getUint32(intptr_t *variable, uint16_t varSize) {
 	case 4:
 		return *(uint32_t*) variable;
 	}
+	return 0;
 }
 
-void setUint32(intptr_t *variable, uint16_t varSize, uint32_t value) {
+void lcp_setUint32(intptr_t *variable, uint16_t varSize, uint32_t value) {
 	switch (varSize) {
 	default:
 		*(uint8_t*) variable = (uint8_t) value;
@@ -272,4 +270,44 @@ void setUint32(intptr_t *variable, uint16_t varSize, uint32_t value) {
 		*(uint32_t*) variable = (uint32_t) value;
 		break;
 	}
+}
+
+int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals) {
+	char buf[16];
+	uint32_t powww = pow10i(decimals);
+	int32_t integer = value / powww;
+	int32_t decimal = value % powww;
+	int isize = 0;
+
+	if (decimals == 0) {
+		isize = sprintf(buf, "%" PRId32, integer);
+	} else {
+		isize = sprintf(buf, "%" PRId32 ".", integer);
+		int dsize = sprintf(buf + isize, "%" PRId32, decimal);
+		//add extra 0's
+		if (dsize < decimals) {
+			for (int i = 0; i <= decimals; i++) {
+				if (i > dsize) {
+					//add 0's after point
+					buf[isize + decimals - i] = '0';
+				} else {
+					//move decimal part in buffer including zero
+					buf[isize + decimals - i] = buf[isize + dsize - i];
+				}
+			}
+			//buf[isize + decimals] = 0;
+		}
+	}
+	//total size
+	isize = isize + decimals;
+	buf[isize] = 0; //end
+	memcpy(buffer, buf, isize + 1); //+null
+	return isize;
+}
+
+uint32_t pow10i(uint8_t pow) {
+	uint32_t ret = 1;
+	for (; pow > 0; pow--)
+		ret *= 10;
+	return ret;
 }

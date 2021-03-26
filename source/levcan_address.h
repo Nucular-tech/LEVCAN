@@ -25,7 +25,7 @@
 
 LC_Return_t LC_AddressInit(LC_NodeDescriptor_t* node);
 void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time);
-void LC_ConfigureFilters(LC_NodeDescriptor_t* node);
+LC_EXPORT void LC_ConfigureFilters(LC_NodeDescriptor_t* node);
 
 typedef enum {
 	LC_AdressNothing,

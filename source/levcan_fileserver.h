@@ -26,4 +26,4 @@
 #include <stdint.h>
 
 LC_EXPORT LC_Return_t LC_FileServerInit(LC_NodeDescriptor_t* node);
-LC_EXPORT void LC_FileServer(LC_NodeDescriptor_t* node, uint32_t tick, void* server);
+LC_EXPORT LC_Return_t LC_FileServer(LC_NodeDescriptor_t* node, uint32_t tick);

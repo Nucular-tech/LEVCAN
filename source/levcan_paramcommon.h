@@ -20,12 +20,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  ******************************************************************************/
-/*
- * levcan_paramcommon.h
- *
- *  Created on: 2 февр. 2021 г.
- *      Author: VasiliSk
- */
 
 #pragma once
 
@@ -57,6 +51,7 @@ typedef enum {
 	LCP_Uint64, //LCP_Uint64_t
 	LCP_Float, //LCP_Float_t
 	LCP_Double, //LCP_Double_t
+	LCP_Decimal32, //LCP_Decimal32_t
 	LCP_String, //LCP_String_t
 	LCP_End = 0xFF
 } LCP_Type_t;
@@ -78,28 +73,24 @@ typedef struct {
 	uint32_t Min;
 	uint32_t Max;
 	uint32_t Step;
-	uint8_t Decimals;
 } LCP_Uint32_t;
 
 typedef struct {
 	int32_t Min;
 	int32_t Max;
 	int32_t Step;
-	uint8_t Decimals;
 } LCP_Int32_t;
 
 typedef struct {
 	uint64_t Min;
 	uint64_t Max;
 	uint64_t Step;
-	uint8_t Decimals;
 } LCP_Uint64_t;
 
 typedef struct {
 	int64_t Min;
 	int64_t Max;
 	int64_t Step;
-	uint8_t Decimals;
 } LCP_Int64_t;
 
 typedef struct {
@@ -113,6 +104,13 @@ typedef struct {
 	double Max;
 	double Step;
 } LCP_Double_t;
+
+typedef struct {
+	int32_t Min;
+	int32_t Max;
+	int32_t Step;
+	uint8_t Decimals;
+} LCP_Decimal32_t;
 
 typedef struct {
 	uint16_t Flags; //LCP_StringFlags
@@ -133,3 +131,18 @@ typedef enum {
 } LCP_StringFlags;
 
 LC_EXPORT LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type);
+
+int32_t lcp_getInt32(intptr_t *variable, uint16_t varSize);
+void lcp_setInt32(intptr_t *variable, uint16_t varSize, int32_t value);
+LC_Return_t lcp_i32inRange(intptr_t *variable, uint16_t varSize, int32_t min, int32_t max);
+LC_Return_t lcp_i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, int64_t max);
+
+uint32_t lcp_getUint32(intptr_t *variable, uint16_t varSize);
+void lcp_setUint32(intptr_t *variable, uint16_t varSize, uint32_t value);
+LC_Return_t lcp_u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, uint32_t max);
+LC_Return_t lcp_u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint64_t max);
+
+LC_Return_t lcp_f32inRange(intptr_t *variable, uint16_t varSize, float min, float max);
+LC_Return_t lcp_d64inRange(intptr_t *variable, uint16_t varSize, double min, double max);
+
+int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals);

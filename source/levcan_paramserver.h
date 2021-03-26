@@ -58,6 +58,7 @@ typedef struct {
 		LCP_Float_t: 	LCP_Float,	\
 		LCP_Double_t: 	LCP_Double, \
 		LCP_Enum_t:  	LCP_Enum, 	\
+		LCP_Decimal32_t: LCP_Decimal32, \
 		LCP_Bitfield32_t: LCP_Bitfield32)
 
 #define pstd( _AccessLvl, _Mode, _Var, _Desc, _Name, _Text) \
@@ -77,4 +78,5 @@ typedef struct {
 #define directory(_directory, _arrayIndex, _AccessLvl, _Name  ) \
 	{ _directory, _Name, ARRAYSIZ(_directory), _arrayIndex, _AccessLvl }
 
-LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node);
+LC_EXPORT LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node);
+LC_EXPORT void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index);

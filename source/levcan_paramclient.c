@@ -295,7 +295,8 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *node, uint8_t from_node, uin
 	//thread safe
 	if (command == lcp_reqVariable) {
 		if (bufferEntry.VarSize == dataSize) {
-			memcpy(outData, bufferEntry.Variable, dataSize);
+			if (bufferEntry.Variable)
+				memcpy(outData, bufferEntry.Variable, dataSize);
 			LCP_CleanEntry(&bufferEntry); //clean, since data copied
 		}
 		else {

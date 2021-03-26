@@ -68,7 +68,7 @@ enum {
 
 typedef struct {
 	uint16_t Operation;
-	LC_FileAccess_t Mode;
+	uint8_t Mode; //LC_FileAccess_t
 	char Name[];
 } fOpOpen_t;
 

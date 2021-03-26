@@ -118,6 +118,37 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 		}
 	}
 
+#if (LEVCAN_MAX_TABLE_NODES) > 0
+	//now look for dead nodes...
+	static uint32_t offline_tick = 0;
+	const uint16_t off_period = 250;    //0.25s
+	offline_tick += time;
+	if (offline_tick > off_period) {
+		LC_NodeTableEntry_t *node_table = node->NodeTable->Table;
+		for (int i = 0; i < LEVCAN_MAX_TABLE_NODES; i++) {
+			//send every node id
+			if (node_table[i].ShortName.NodeID < LC_Null_Address) {
+				node_table[i].LastRXtime += offline_tick;
+				if (node_table[i].LastRXtime > 1500) {
+					//timeout, delete node
+#ifdef LEVCAN_TRACE
+					trace_printf("Node lost, timeout:%d\n", node_table[i].ShortName.NodeID);
+#endif
+					if (lc_addressCallback) {
+						lc_addressCallback(node_table[i].ShortName, i, LC_AdressDeleted);
+					}
+					node_table[i].ShortName.NodeID = LC_Broadcast_Address;
+				}
+				else if (node_table[i].LastRXtime > 1000) {
+					//ask node, is it online?
+					lc_sendDiscoveryRequest(node, node_table[i].ShortName.NodeID);
+				}
+			}
+		}
+		offline_tick = offline_tick % off_period;
+	}
+#endif
+
 }
 
 void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
@@ -125,7 +156,6 @@ void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void 
 	(void)node;
 
 	if (header.Request) {
-		int i = 0;
 		//TODO what to do with null?
 		if (header.Target == LC_Broadcast_Address) {
 			//send every node id

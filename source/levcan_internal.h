@@ -20,3 +20,6 @@ typedef struct {
 } lc_Extensions_t;
 
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
+
+#define LEVCAN_MESSAGE_TIMEOUT 500
+#define LEVCAN_NODE_TIMEOUT 1500

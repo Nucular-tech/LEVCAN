@@ -20,14 +20,18 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  ******************************************************************************/
+#include <string.h>
+#include <stdio.h>
+#include <inttypes.h>
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
-#include <string.h>
+#include "levcan_paramcommon.h"
 
 static int checkExists(const LCPS_Directory_t directories[], uint16_t dirsize, uint16_t directory, int32_t entry_index);
 static const char* extractEntryName(const LCPS_Directory_t directories[], uint16_t dirsize, const LCPS_Entry_t *entry);
 void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
+void* getValueByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex);
 
 LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
 	//register function call to this object
@@ -180,7 +184,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 
 						if (request.Command & lcp_reqVariable) {
 							if ((entry->Variable != 0) && ((entry->Mode & LCP_WriteOnly) == 0)) {
-								sendRec.Address = (void*) entry->Variable;
+								sendRec.Address = getValueByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex);
 								sendRec.Attributes.Cleanup = 0;
 								sendRec.Size = entry->VarSize;
 								status = LC_SendMessage(node, &sendRec, LC_SYS_ParametersValue);
@@ -240,7 +244,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 #endif
 									) {
 						status = LC_Ok;
-						memcpy((void*) entry->Variable, data, varsize);
+						memcpy(getValueByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex), data, varsize);
 					}
 				} else {
 					status = LC_DataError;
@@ -260,6 +264,15 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 		sendRec.Size = sizeof(lc_request_error_t);
 		LC_SendMessage(node, &sendRec, LC_SYS_ParametersData);
 	}
+}
+
+void* getValueByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex) {
+	if (variable0 == 0)
+		return 0;
+	//get value from array[]
+	char *varPtr = (char*) variable0;
+	varPtr += size * arrayIndex;
+	return varPtr;
 }
 
 static int checkExists(const LCPS_Directory_t directories[], uint16_t dirsize, uint16_t directory, int32_t entry_index) {
@@ -290,4 +303,157 @@ static const char* extractEntryName(const LCPS_Directory_t directories[], uint16
 		source = entry->Name;
 	}
 	return source;
+}
+
+const char *equality = " = ";
+const char *newline = "\n";
+
+void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
+	if (buffer == 0)
+		return;
+
+	if (index >= dir->Size)
+		return;
+	const LCPS_Entry_t *entry = &dir->Entries[index];
+	if (entry == NULL)
+		return;
+	//for string this enough
+	buffer[0] = 0;
+	strcpy(buffer, entry->Name);
+	if (entry->EntryType != LCP_Label)
+		strcat(buffer, equality); //" = "
+
+	switch (entry->EntryType) {
+	case LCP_Label: {
+		strcat(buffer, " ");
+		strcat(buffer, entry->TextData);
+	}
+		break;
+	case LCP_String: {
+		if (entry->Variable) {
+			//todo upgrade logic here
+			snprintf(buffer + strlen(buffer), 128, "\"%s\"", (char*) entry->Variable);
+		}
+	}
+		break;
+	case LCP_Bool:
+	case LCP_Bitfield32:
+	case LCP_Uint32: {
+		uint32_t val_u32 = lcp_getUint32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, val_u32);
+		} else {
+			sprintf(buffer + strlen(buffer), "%" PRIu32, val_u32);
+		}
+	}
+		break;
+	case LCP_Uint64: {
+		uint64_t val_u64 = *(uint64_t*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, val_u64);
+		} else {
+			sprintf(buffer + strlen(buffer), "%" PRIu64, val_u64);
+		}
+	}
+		break;
+	case LCP_Int32: {
+		int32_t val_i32 = lcp_getInt32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, val_i32);
+		} else {
+			sprintf(buffer + strlen(buffer), "%" PRId32, val_i32);
+		}
+	}
+		break;
+	case LCP_Int64: {
+		int64_t val_i64 = *(int64_t*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, val_i64);
+		} else {
+			sprintf(buffer + strlen(buffer), "%" PRId64, val_i64);
+		}
+	}
+		break;
+	case LCP_Decimal32: {
+		strcat(buffer, equality);
+		int32_t val_u32 = lcp_getInt32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		int dec = 0;
+		if (entry->Descriptor && entry->EntryType == LCP_Uint32) {
+			dec = ((LCP_Decimal32_t*) entry->Descriptor)->Decimals;
+		}
+		char *tDataEnd = 0;
+		if (entry->TextData) {
+			char *ptr = strstr(entry->TextData, "%s");
+			if (ptr) {
+				tDataEnd = ptr + 2; //skip %s
+				int size = entry->TextData - ptr;
+				if (size > 0) {
+					//print beginnings
+					strncat(buffer, entry->TextData, size);
+				}
+			}
+		}
+		lcp_print_i32f(buffer + strlen(buffer), val_u32, dec);
+		if (tDataEnd) {
+			//print end of custom text
+			strcat(buffer, tDataEnd);
+		}
+	}
+		break;
+	case LCP_Enum: {
+		uint32_t val_u32 = lcp_getUint32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		LCP_Enum_t *enumDesc = (LCP_Enum_t*) entry->Descriptor;
+
+		const char *position = 0;
+		if (enumDesc->Min <= val_u32) {
+			//value should be above minimum
+			position = entry->TextData;
+			uint32_t minval = val_u32 - enumDesc->Min;
+			for (uint32_t i = 0; (i < minval); i++) {
+				position = strchr(position, '\n'); //look for buffer specified by val index
+				if (position == 0)
+					break;
+				position++; //skip '\n'
+			}
+		}
+		if (position == 0) {
+			sprintf(buffer + strlen(buffer), "%" PRIu32, val_u32);
+		} else {
+			char *end = strchr(position, '\n'); //search for buffer end
+			if (end) {
+				strncat(buffer, position, end - position);
+			} else
+				strcat(buffer, position);	//end is possible zero
+		}
+	}
+		break;
+
+#ifdef LEVCAN_USE_FLOAT
+	case LCP_Float: {
+		float fval = *(float*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, fval);
+		} else {
+			sprintf(buffer + strlen(buffer), "%.9f", fval);
+		}
+	}
+		break;
+#endif
+#ifdef LEVCAN_USE_DOUBLE
+	case LCP_Double: {
+		double dval = *(double*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, dval);
+		} else {
+			sprintf(buffer + strlen(buffer), "%.17g", dval);
+		}
+	}
+		break;
+#endif
+	default:
+		break;
+	}
+	strcat(buffer, newline);
+
+	return;
 }
