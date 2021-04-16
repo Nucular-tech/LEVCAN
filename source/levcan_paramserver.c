@@ -200,19 +200,9 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 
 					}
 				} else { //entry access lvl
-					if (request.Command < lcp_reqFullEntry) {
 						//partial request is not a search
 						status = LC_AccessError;
 						break; //end while
-					} else {
-						//skip locked entries
-						if ((int) request.Entry < ((int) directory->Size) - 1) {
-							request.Entry++;
-						} else {
-							status = LC_OutOfRange;
-							break; //end while
-						}
-					}
 				}
 			} else { //directory access lvl
 				status = LC_AccessError;

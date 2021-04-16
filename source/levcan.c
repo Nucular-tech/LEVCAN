@@ -550,7 +550,7 @@ LC_Return_t lc_sendDataToQueue(LC_NodeDescriptor_t *node, LC_HeaderPacked_t hdr,
 	}
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	//todo queue may return fault
-	LC_QueueSendToBack(node->TxRxObjects.txQueue, &msgTX, 1);
+	LC_QueueSendToBack(node->TxRxObjects.txQueue, &msgTX, 0);
 	//LC_SemaphoreGive(node->TxRxObjects.txSemph);
 #else
 	txFIFO[txFIFO_in] = msgTX;
