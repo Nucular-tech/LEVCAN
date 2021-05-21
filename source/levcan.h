@@ -22,6 +22,7 @@
  ******************************************************************************/
 
 #include "stdint.h"
+#include "stddef.h"
  /* Application specific configuration options. */
 #include "levcan_config.h"
 
@@ -179,10 +180,12 @@ enum {
 
 typedef LC_Return_t(*HAL_Send_t)(LC_HeaderPacked_t header, uint32_t* data, uint8_t length);
 typedef LC_Return_t(*HAL_Filter_t)(LC_HeaderPacked_t* reg, LC_HeaderPacked_t* mask, uint16_t count);
+typedef LC_Return_t(*HAL_TxHalfFull_t)(void);
 
 typedef struct {
 	HAL_Send_t Send;
 	HAL_Filter_t Filter;
+	HAL_TxHalfFull_t TxHalfFull;
 } LC_DriverCalls_t;
 
 typedef struct {
@@ -195,6 +198,39 @@ typedef struct {
 	uint16_t TableSize;
 	//uint16_t FreeSlots;
 } LC_NodeTable_t;
+
+typedef struct {
+	LC_HeaderPacked_t header;
+	uint32_t data[2];
+	uint8_t length;
+} lc_msgBuffered;
+
+typedef struct {
+	union {
+		char *Pointer;
+#ifdef LEVCAN_MEM_STATIC
+		char Data[LEVCAN_OBJECT_DATASIZE];
+#else
+		char Data[sizeof(char*)];
+#endif
+	};
+	intptr_t *Next;
+	intptr_t *Previous;
+	int32_t Length;
+	int32_t Position;    //get parity - divide by 8 and &1
+	LC_HeaderPacked_t Header;
+	uint16_t Time_since_comm;
+	uint8_t Attempt;
+	union {
+		struct {
+			uint8_t TCP :1;
+			uint8_t TXcleanup :1;
+			uint8_t ReadyToRX :1;
+			uint8_t ToDelete :1;
+		} Flags;
+		uint8_t FlagsTotal;
+	};
+} lc_objBuffered;
 
 typedef struct {
 	const void* Driver;
@@ -214,8 +250,8 @@ typedef struct {
 	uint8_t AccessLevel;
 	//not for public use
 	struct {
-#ifdef LEVCAN_STATIC_MEM
-		objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
+#ifdef LEVCAN_MEM_STATIC
+		lc_objBuffered objectBuffer[LEVCAN_OBJECT_SIZE];
 		int16_t objectBuffer_freeID;
 #endif
 #ifdef LEVCAN_USE_RTOS_QUEUE
@@ -225,11 +261,7 @@ typedef struct {
 #endif
 		void *rxQueue;
 #else
-#ifndef LEVCAN_NO_TX_QUEUE
-		msgBuffered txFIFO[LEVCAN_TX_SIZE];
-		volatile uint16_t txFIFO_in, txFIFO_out;
-#endif
-		msgBuffered rxFIFO[LEVCAN_RX_SIZE];
+		lc_msgBuffered rxFIFO[LEVCAN_RX_SIZE];
 		volatile uint16_t rxFIFO_in, rxFIFO_out;
 #endif
 		volatile void *objTXbuf_start;
@@ -240,6 +272,10 @@ typedef struct {
 	LC_NodeTable_t* NodeTable;
 	void* Extensions;
 	LC_Object_t SystemObjects[LEVCAN_SYS_OBJ_SIZ];
+#ifdef LEVCAN_MEM_STATIC
+	LC_NodeTable_t NodeTableStatic;
+	LC_NodeTableEntry_t NodeTableEntryStatic[LEVCAN_MAX_TABLE_NODES];
+#endif
 } LC_NodeDescriptor_t;
 
 typedef void(*LC_FunctionCall_t)(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
@@ -252,7 +288,6 @@ LC_EXPORT void LC_ReceiveHandler(LC_NodeDescriptor_t* node, LC_HeaderPacked_t he
 //Managers should be called from separate tasks, if LEVCAN_USE_RTOS_QUEUE set
 LC_EXPORT void LC_NetworkManager(LC_NodeDescriptor_t* node, uint32_t time); //low priority
 LC_EXPORT void LC_ReceiveManager(LC_NodeDescriptor_t* node); //high priority
-LC_EXPORT void LC_TransmitManager(LC_NodeDescriptor_t* node); //high priority
 
 LC_EXPORT LC_Return_t LC_SendMessage(LC_NodeDescriptor_t* node, LC_ObjectRecord_t *object, uint16_t index);
 LC_EXPORT LC_Return_t LC_SendRequest(LC_NodeDescriptor_t* node, uint16_t target, uint16_t index);

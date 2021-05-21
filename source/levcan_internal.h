@@ -14,10 +14,18 @@ typedef struct {
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	void *frxQueue;
 #else
-	volatile fOpAck_t rxack = { 0 };
+	volatile fOpAck_t rxack;
 #endif
 #endif
 } lc_Extensions_t;
+
+#ifndef LEVCAN_MAX_OWN_NODES
+#define LEVCAN_MAX_OWN_NODES 1
+#endif
+
+#ifdef LEVCAN_MEM_STATIC
+lc_Extensions_t lc_ExtensionsStatic[LEVCAN_MAX_OWN_NODES];
+#endif
 
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
 

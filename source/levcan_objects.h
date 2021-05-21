@@ -74,6 +74,9 @@ typedef enum {
 	LC_Obj_DCLimitVValue,
 	LC_Obj_DateTime,
 	LC_Obj_DateTimeSet,
+	LC_Obj_FOCstateV,
+	LC_Obj_FOCstateI,
+	LC_Obj_FOCreqest,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -271,3 +274,18 @@ typedef struct {
 	uint8_t Month;
 	uint16_t Year;
 } LC_Obj_DateTime_t;
+
+typedef struct {
+	float Vq;
+	float Vd;
+} LC_Obj_FOCstateV_t;
+
+typedef struct {
+	float Iq;
+	float Id;
+} LC_Obj_FOCstateI_t;
+
+typedef struct {
+	float Iq_request;
+	float Id_request;
+} LC_Obj_FOCrequest_t;

@@ -72,14 +72,14 @@ LC_Return_t LCP_ParameterClientInit(LC_NodeDescriptor_t *node) {
 
 LC_Return_t LCP_RequestEntry(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, LCPC_Entry_t *out_entry) {
 
-	memset(out_entry, 0, sizeof(out_entry));
-	return requestData(node, from_node, directory_index, entry_index, out_entry, sizeof(out_entry), lcp_reqFullEntry);
+	memset(out_entry, 0, sizeof(*out_entry));
+	return requestData(node, from_node, directory_index, entry_index, out_entry, sizeof(*out_entry), lcp_reqFullEntry);
 }
 
 LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, LCPC_Directory_t *out_directory) {
 
-	memset(out_directory, 0, sizeof(out_directory));
-	return requestData(node, from_node, directory_index, 0, out_directory, sizeof(out_directory), lcp_reqDirectoryInfo);
+	memset(out_directory, 0, sizeof(*out_directory));
+	return requestData(node, from_node, directory_index, 0, out_directory, sizeof(*out_directory), lcp_reqDirectoryInfo);
 
 	/*
 	 LC_Return_t result = LC_Ok;
@@ -385,13 +385,16 @@ void LCP_CleanDirectory(LCPC_Directory_t *dir) {
 }
 
 static void clearQueueAndInit(LC_NodeDescriptor_t *node, uint8_t from_node) {
-	LC_ObjectData_t temp;
+	LC_ObjectData_t temp = { 0 };
 	void *queue = ((lc_Extensions_t*) node->Extensions)->paramClientQueue;
 	//prepare receive
 	((lc_Extensions_t*) node->Extensions)->paramClientRecord.NodeID = from_node;
 	((lc_Extensions_t*) node->Extensions)->paramClientRecord.Address = queue;
 	//request!	
-	for (int result = 0; result = LC_QueueReceive(queue, &temp, 0);) {
-		lcfree(temp.Data);
+	for (int result = 0; result != 0;) {
+		result = LC_QueueReceive(queue, &temp, 0);
+		if (result && temp.Data != 0) {
+			lcfree(temp.Data);
+		}
 	}
 }

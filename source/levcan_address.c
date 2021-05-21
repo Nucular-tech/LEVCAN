@@ -306,7 +306,7 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 		data[0] = claim.ToUint32[0];
 		data[1] = claim.ToUint32[1];
 	}
-	lc_sendDataToQueue(node, header, data, 8 / LEVCAN_MIN_BYTE_SIZE);
+	((LC_DriverCalls_t*) node->Driver)->Send(header, data, 8 / LEVCAN_MIN_BYTE_SIZE);
 }
 
 void lc_claimFreeID(LC_NodeDescriptor_t *node) {
@@ -418,5 +418,5 @@ LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t* node, uint16_t target) 
 	hdr.Source = LC_Broadcast_Address;
 	hdr.Target = target;
 
-	return lc_sendDataToQueue(node, hdr, 0, 0);
+	return ((LC_DriverCalls_t*) node->Driver)->Send(hdr, 0, 0);
 }
