@@ -160,7 +160,7 @@ static LC_Return_t requestData(LC_NodeDescriptor_t *node, uint8_t from_node, uin
 	}
 	//wait for all data
 	for (int attempt = 0; sequence != 0 && attempt < 3;) {
-		int result = LC_QueueReceive(queue, &objData, 100);
+		int result = LC_QueueReceive(queue, &objData, LEVCAN_MESSAGE_TIMEOUT);
 		//todo wrong sender filter
 		if (result) {
 			//data input

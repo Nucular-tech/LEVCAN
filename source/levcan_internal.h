@@ -29,5 +29,7 @@ lc_Extensions_t lc_ExtensionsStatic[LEVCAN_MAX_OWN_NODES];
 
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
 
-#define LEVCAN_MESSAGE_TIMEOUT 500
+#define LEVCAN_COMM_TIMEOUT 100
+//message should be 3x time more than communication
+#define LEVCAN_MESSAGE_TIMEOUT 350
 #define LEVCAN_NODE_TIMEOUT 1500

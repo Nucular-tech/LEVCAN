@@ -45,10 +45,6 @@
 #error "LEVCAN_OBJECT_DATASIZE should be more than one 8 byte for static memory"
 #endif
 
-#ifndef LEVCAN_MIN_BYTE_SIZE
-#define LEVCAN_MIN_BYTE_SIZE 1
-#endif
-
 #define toDeleteMark (1<<3)
 #define RXReadyMark (1<<2)
 
@@ -65,7 +61,7 @@ volatile uint32_t lc_receive_ovfl_cntr = 0;
 LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID, int32_t size, uint8_t read_write, uint8_t nodeID);
 
 uint16_t objectRXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, lc_msgBuffered *msg);
-uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_HeaderPacked_t *request);
+uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_HeaderPacked_t *request, int timeout);
 LC_Return_t objectRXfinish(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, char *data, int32_t size, uint8_t memfree);
 void deleteObject(LC_NodeDescriptor_t *node, lc_objBuffered *obj, lc_objBuffered **start, lc_objBuffered **end);
 uint8_t hashMultiplicative(const uint8_t *input, uint8_t len, uint8_t start);
@@ -266,7 +262,7 @@ void LC_ReceiveHandler(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, uint
 	lc_msgBuffered msgRX;
 	msgRX.data[0] = data[0];
 	msgRX.data[1] = data[1];
-	msgRX.length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
+	msgRX.length = length;
 	msgRX.header = header;
 	//add to queue
 	LC_QueueSendToBackISR(node->TxRxObjects.rxQueue, &msgRX, &yield);
@@ -284,7 +280,7 @@ void LC_ReceiveHandler(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, uint
 	lc_msgBuffered *msgRX = &node->TxRxObjects.rxFIFO[node->TxRxObjects.rxFIFO_in]; //less size in O2 with pointer?! maybe volatile problem
 	msgRX->data[0] = data[0];
 	msgRX->data[1] = data[1];
-	msgRX->length = (length + LEVCAN_MIN_BYTE_SIZE - 1) / LEVCAN_MIN_BYTE_SIZE;
+	msgRX->length = length;
 	msgRX->header = header;
 	node->TxRxObjects.rxFIFO_in = (node->TxRxObjects.rxFIFO_in + 1) % LEVCAN_RX_SIZE;
 
@@ -321,10 +317,10 @@ void LC_NetworkManager(LC_NodeDescriptor_t *node, uint32_t time) {
 			deleteObject(node, txProceed, (lc_objBuffered**) &node->TxRxObjects.objTXbuf_start, (lc_objBuffered**) &node->TxRxObjects.objTXbuf_end);
 		} else if (txProceed->Flags.TCP == 0) {
 			//UDP mode send data continuously
-			objectTXproceed(node, txProceed, 0);
+			objectTXproceed(node, txProceed, 0, LC_Ok);
 		} else {
 			//TCP mode
-			if (txProceed->Time_since_comm > 100) {
+			if (txProceed->Time_since_comm > LEVCAN_COMM_TIMEOUT) {
 				if (txProceed->Attempt >= 3) {
 					//TX timeout, make it free!
 #ifdef LEVCAN_TRACE
@@ -338,10 +334,10 @@ void LC_NetworkManager(LC_NodeDescriptor_t *node, uint32_t time) {
 					deleteObject(node, txProceed, (lc_objBuffered**) &node->TxRxObjects.objTXbuf_start, (lc_objBuffered**) &node->TxRxObjects.objTXbuf_end);
 				} else {
 					// Try tx again
-					objectTXproceed(node, txProceed, 0);
-					//TOdo may cause buffer overflow if CAN is offline
-					if (txProceed->Time_since_comm == 0)
-						txProceed->Attempt++;
+					objectTXproceed(node, txProceed, 0, LC_Timeout);
+					//may cause buffer overflow if CAN is offline
+					//if (txProceed->Time_since_comm == 0)
+					txProceed->Attempt++;
 				}
 			}
 		}
@@ -475,12 +471,13 @@ LC_Header_t LC_HeaderUnpack(LC_HeaderPacked_t header) {
 	return hdr;
 }
 
-uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_HeaderPacked_t *request) {
+uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_HeaderPacked_t *request, int timeout) {
 	int32_t length;
 	uint32_t data[2];
-	uint32_t step_inc = (8 / LEVCAN_MIN_BYTE_SIZE);
+	uint32_t step_inc = 8;
 	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
-	if (request) {
+	//requests and timeout only TCP
+	if (object->Flags.TCP == 1 && (request || timeout)) {
 		if (request->EoM) {
 			//TX finished? delete this buffer anyway
 #ifdef LEVCAN_TRACE
@@ -496,22 +493,21 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 			//delete object from memory chain, find new endings
 			object->Pointer = 0;
 			object->FlagsTotal = toDeleteMark;
-			//deleteObject(node, object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
 			return 0;
 		}
-		if (parity != request->Parity) {
+		if (parity != request->Parity || timeout) {
 			// trace_printf("Request got invalid parity -\n");
 			if (object->Time_since_comm == 0)
 				return 0;    //avoid request spamming
 
 			//requested previous data pack, latest was lost
-			int reminder = object->Position % (8 / LEVCAN_MIN_BYTE_SIZE);
-			reminder = (reminder == 0) ? (8 / LEVCAN_MIN_BYTE_SIZE) : reminder;
+			int reminder = object->Position % (8);
+			reminder = (reminder == 0) ? (8) : reminder;
 			//roll back position
 			object->Position -= reminder;
 			if (object->Position < 0)
 				object->Position = 0;    //just in case... WTF
-			parity = ~((object->Position + 7) / (8 / LEVCAN_MIN_BYTE_SIZE)) & 1;    //parity
+			parity = ~((object->Position + 7) / (8)) & 1;    //parity
 #ifdef LEVCAN_TRACE
 			// trace_printf("TX object parity lost:%d position:%d\n", object->Header.MsgID, object->Position);
 #endif
@@ -526,22 +522,22 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 		length = 0;
 		if (object->Length >= 0) {
 			length = object->Length - object->Position;
-			if (length > (8 / LEVCAN_MIN_BYTE_SIZE))
-				length = 8 / LEVCAN_MIN_BYTE_SIZE;
+			if (length > (8))
+				length = 8;
 			//set data end
 			if (object->Length == object->Position + length)
 				newhdr.EoM = 1;
 			else
 				newhdr.EoM = 0;
 		} else {
-			length = strnlen((char*) &object->Pointer[object->Position], (8 / LEVCAN_MIN_BYTE_SIZE));
-			if (length < (8 / LEVCAN_MIN_BYTE_SIZE)) {
+			length = strnlen((char*) &object->Pointer[object->Position], (8));
+			if (length < (8)) {
 				length++;    //ending zero byte
 				newhdr.EoM = 1;
 			} else
 				newhdr.EoM = 0;
 		}
-		//if (length < 0)
+		//if (length <= 0)
 		//	asm volatile ("bkpt");
 		//Extract new portion of data in obj. null length cant be
 		memcpy(data, &object->Pointer[object->Position], length);
@@ -552,16 +548,21 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 			newhdr.RTS_CTS = 0;
 
 		newhdr.Parity = object->Flags.TCP ? parity : 0;    //parity
-		//try to send
-		if (((LC_DriverCalls_t*) node->Driver)->Send(newhdr, data, length))
-			return LC_BufferFull;
-		//increment if sent succesful
-		object->Position += length;
+
 		object->Header = newhdr;    //update to new only here
-		object->Time_since_comm = 0;    //data sent
+		object->Position += length;
+		//try to send
+		if (((LC_DriverCalls_t*) node->Driver)->Send(newhdr, data, length)) {
+			//UDP have no timeout recover, make a roll back and rescue some bytes
+			if (object->Flags.TCP == 0)
+				object->Position -= length;
+			return LC_BufferFull;
+		}
+		object->Time_since_comm = 0;    //data sent ok
 		//cycle if this is UDP till message end or buffer 3/4 fill
 	} while ((object->Flags.TCP == 0) && (((LC_DriverCalls_t*) node->Driver)->TxHalfFull() != LC_BufferFull) && (object->Header.EoM == 0));
 	//in UDP mode delete object when EoM is set
+	//TCP deleted when RTR acknowledgment EoM received
 	if ((object->Flags.TCP == 0) && (object->Header.EoM == 1)) {
 #ifndef LEVCAN_MEM_STATIC
 		if (object->Flags.TXcleanup) {
@@ -570,7 +571,6 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 #endif
 		object->Pointer = 0;
 		object->Flags.ToDelete = 1;
-		//deleteObject(node, object, (objBuffered**) &objTXbuf_start, (objBuffered**) &objTXbuf_end);
 	}
 	return 0;
 }
@@ -578,7 +578,7 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 uint16_t objectRXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, lc_msgBuffered *msg) {
 	if ((msg != 0) && (msg->header.RTS_CTS && object->Position != 0))
 		return 1; //position 0 can be started only with RTS (RTS will create new transfer object)
-	uint32_t step_inc = (8 / LEVCAN_MIN_BYTE_SIZE);
+	uint32_t step_inc = (8);
 	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
 	int32_t position_new = object->Position;
 
@@ -823,10 +823,10 @@ LC_Return_t LC_SendMessage(LC_NodeDescriptor_t *node, LC_ObjectRecord_t *object,
 		dataAddr = *(char**) dataAddr;
 
 	if (object->Size < 0)
-		strl = strnlen(dataAddr, (8 / LEVCAN_MIN_BYTE_SIZE));
+		strl = strnlen(dataAddr, (8));
 	//negative size means this is string - any length
 
-	if ((object->Attributes.TCP) || (object->Size > (8 / LEVCAN_MIN_BYTE_SIZE)) || ((object->Size < 0) && (strl == (8 / LEVCAN_MIN_BYTE_SIZE)))) {
+	if ((object->Attributes.TCP) || (object->Size > (8)) || ((object->Size < 0) && (strl == (8)))) {
 		//avoid dual same id
 		lc_objBuffered *txProceed = findObject((lc_objBuffered*) node->TxRxObjects.objTXbuf_start, index, object->NodeID, node->ShortName.NodeID);
 		if (txProceed) {
@@ -868,9 +868,9 @@ LC_Return_t LC_SendMessage(LC_NodeDescriptor_t *node, LC_ObjectRecord_t *object,
 		newTXobj->Flags.TCP = object->Attributes.TCP;
 		newTXobj->Flags.TXcleanup = object->Attributes.Cleanup;
 		//process it first to avoid collision in multithread
-		objectTXproceed(node, newTXobj, 0);
-		//add to queue, critical section
 		lc_disable_irq();
+		objectTXproceed(node, newTXobj, 0, LC_Ok);
+		//add to queue, critical section
 		if ((volatile lc_objBuffered*) node->TxRxObjects.objTXbuf_start == 0) {
 			//no objects in tx array
 			newTXobj->Previous = 0;
@@ -966,12 +966,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 						LC_SendMessage(node, &obj, rxBuffered.header.MsgID);
 					} else {
 #ifdef LEVCAN_TRACE
-						//trace_printf("RX dual request denied:%d, from node:%d \n", rxBuffered.header.MsgID, rxBuffered.header.Source);
-#endif
-#ifdef __GNUC__
-						asm("nop");
-#else
-						__nop();
+						trace_printf("RX dual request denied:%d, from node:%d \n", rxBuffered.header.MsgID, rxBuffered.header.Source);
 #endif
 					}
 				}
@@ -980,7 +975,11 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 				lc_objBuffered *TXobj = findObject((void*) node->TxRxObjects.objTXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Source,
 						rxBuffered.header.Target);
 				if (TXobj) {
-					objectTXproceed(node, TXobj, &rxBuffered.header);
+					objectTXproceed(node, TXobj, &rxBuffered.header, LC_Ok);
+				} else {
+#ifdef LEVCAN_TRACE
+						trace_printf("RX unknown data:%d, from node:%d \n", rxBuffered.header.MsgID, rxBuffered.header.Source);
+#endif
 				}
 			}
 		} else {
