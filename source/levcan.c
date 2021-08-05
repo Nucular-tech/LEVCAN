@@ -24,7 +24,6 @@
 #include "levcan.h"
 #include "levcan_internal.h"
 #include "levcan_address.h"
-#include "levcan_param.h"
 
 #include "string.h"
 #include "stdlib.h"

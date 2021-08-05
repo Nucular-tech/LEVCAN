@@ -27,7 +27,6 @@
 #include "levcan_paraminternal.h"
 #include "levcan_paramcommon.h"
 
-uint32_t pow10i(uint8_t pow);
 
 LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type) {
 	if (variable == 0 || varSize == 0)
@@ -108,7 +107,7 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 #ifdef LEVCAN_USE_DOUBLE
 	case LCP_Double: { //LCP_Double_t
 		if (descSize != sizeof(LCP_Double_t)) {
-			return;
+			return LC_DataError;
 		}
 		const LCP_Double_t *desc = (LCP_Double_t*)descriptor;
 		return lcp_d64inRange(variable, varSize, desc->Min, desc->Max);
@@ -272,18 +271,33 @@ void lcp_setUint32(intptr_t *variable, uint16_t varSize, uint32_t value) {
 	}
 }
 
+/// Print integer with decimal point
+/// @param buffer - output text
+/// @param value - input value
+/// @param decimals - number count after dot
+/// @return
 int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals) {
 	char buf[16];
-	uint32_t powww = pow10i(decimals);
-	int32_t integer = value / powww;
-	int32_t decimal = value % powww;
+	uint32_t powww = lcp_pow10i(decimals);
+
+	if (value < 0) {
+		if (value == INT32_MIN) {
+			value = INT32_MAX;
+		} else {
+			value = -value;
+		}
+		*buffer++ = '-';
+	}
+
+	uint32_t integer = value / powww;
+	uint32_t decimal = value % powww;
 	int isize = 0;
 
 	if (decimals == 0) {
-		isize = sprintf(buf, "%" PRId32, integer);
+		isize = sprintf(buf, "%" PRIu32, integer);
 	} else {
-		isize = sprintf(buf, "%" PRId32 ".", integer);
-		int dsize = sprintf(buf + isize, "%" PRId32, decimal);
+		isize = sprintf(buf, "%" PRIu32 ".", integer);
+		int dsize = sprintf(buf + isize, "%" PRIu32, decimal);
 		//add extra 0's
 		if (dsize < decimals) {
 			for (int i = 0; i <= decimals; i++) {
@@ -305,7 +319,28 @@ int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals) {
 	return isize;
 }
 
-uint32_t pow10i(uint8_t pow) {
+/// Print binary value of uint32_t = 0b1010
+int lcp_print_u32b(char *buffer, uint32_t value) {
+	const int intsizetext = 33;
+	char bufBinary[intsizetext];
+	memset(bufBinary, 0, intsizetext);
+	*buffer++ = '0';
+	*buffer++ = 'b';
+	int lastNonZero = intsizetext - 2; //no zero and get index position
+
+	do {
+		bufBinary[lastNonZero] = (value & 1) ? '1' : '0';
+		value = value >> 1;
+		lastNonZero--;
+	} while (lastNonZero >= 0 && (value > 0));
+
+	lastNonZero++; //roll back
+	int size = intsizetext - lastNonZero;
+	memcpy(buffer, &bufBinary[lastNonZero], size); //+null
+	return size + 2; //+0b
+}
+
+uint32_t lcp_pow10i(uint8_t pow) {
 	uint32_t ret = 1;
 	for (; pow > 0; pow--)
 		ret *= 10;

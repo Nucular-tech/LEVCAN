@@ -24,6 +24,7 @@
 #include "stdint.h"
 #include "stddef.h"
  /* Application specific configuration options. */
+
 #include "levcan_config.h"
 
 #pragma once

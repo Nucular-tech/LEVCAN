@@ -146,3 +146,7 @@ LC_Return_t lcp_f32inRange(intptr_t *variable, uint16_t varSize, float min, floa
 LC_Return_t lcp_d64inRange(intptr_t *variable, uint16_t varSize, double min, double max);
 
 int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals);
+int lcp_print_u32b(char *buffer, uint32_t value) ;
+
+
+uint32_t lcp_pow10i(uint8_t pow);

@@ -23,15 +23,20 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <ctype.h>
+#include <stdlib.h>
+
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
 #include "levcan_paramcommon.h"
 
-static int checkExists(const LCPS_Directory_t directories[], uint16_t dirsize, uint16_t directory, int32_t entry_index);
-static const char* extractEntryName(const LCPS_Directory_t directories[], uint16_t dirsize, const LCPS_Entry_t *entry);
+//Private functions
 void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
-void* getValueByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex);
+static int checkExists(const LCPS_Directory_t directories[], uint16_t dirsize, uint16_t directory, int32_t entry_index);
+static const char* extractEntryName(const LCPS_Directory_t directories[], uint16_t dirsize, const LCPS_Entry_t *entry);
+void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex);
+const char* skipspaces(const char *s);
 
 LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
 	//register function call to this object
@@ -184,7 +189,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 
 						if (request.Command & lcp_reqVariable) {
 							if ((entry->Variable != 0) && ((entry->Mode & LCP_WriteOnly) == 0)) {
-								sendRec.Address = getValueByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex);
+								sendRec.Address = getVAddressByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex);
 								sendRec.Attributes.Cleanup = 0;
 								sendRec.Size = entry->VarSize;
 								status = LC_SendMessage(node, &sendRec, LC_SYS_ParametersValue);
@@ -200,9 +205,9 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 
 					}
 				} else { //entry access lvl
-						//partial request is not a search
-						status = LC_AccessError;
-						break; //end while
+						 //partial request is not a search
+					status = LC_AccessError;
+					break; //end while
 				}
 			} else { //directory access lvl
 				status = LC_AccessError;
@@ -234,7 +239,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 #endif
 									) {
 						status = LC_Ok;
-						memcpy(getValueByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex), data, varsize);
+						memcpy(getVAddressByIndex(entry->Variable, entry->VarSize, directory->ArrayIndex), data, varsize);
 					}
 				} else {
 					status = LC_DataError;
@@ -256,7 +261,8 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 	}
 }
 
-void* getValueByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex) {
+/// Extracts value pointer from array (arrayIndex > 0)
+void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex) {
 	if (variable0 == 0)
 		return 0;
 	//get value from array[]
@@ -297,6 +303,9 @@ static const char* extractEntryName(const LCPS_Directory_t directories[], uint16
 
 const char *equality = " = ";
 const char *newline = "\n";
+const char *endline = "#=\n\r";
+const char *endlinedir = "]#=\n\r";
+const char *off_on = "OFF\nON";
 
 void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	if (buffer == 0)
@@ -326,19 +335,24 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		}
 	}
 		break;
-	case LCP_Bool:
-	case LCP_Bitfield32:
+	case LCP_Bitfield32: {
+		uint32_t val_u32 = lcp_getUint32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		lcp_print_u32b(buffer + strlen(buffer), val_u32);
+	}
+		break;
 	case LCP_Uint32: {
-		uint32_t val_u32 = lcp_getUint32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		uint32_t val_u32 = lcp_getUint32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, val_u32);
 		} else {
+
 			sprintf(buffer + strlen(buffer), "%" PRIu32, val_u32);
+
 		}
 	}
 		break;
 	case LCP_Uint64: {
-		uint64_t val_u64 = *(uint64_t*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		uint64_t val_u64 = *(uint64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, val_u64);
 		} else {
@@ -347,7 +361,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	}
 		break;
 	case LCP_Int32: {
-		int32_t val_i32 = lcp_getInt32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		int32_t val_i32 = lcp_getInt32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, val_i32);
 		} else {
@@ -356,7 +370,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	}
 		break;
 	case LCP_Int64: {
-		int64_t val_i64 = *(int64_t*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		int64_t val_i64 = *(int64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, val_i64);
 		} else {
@@ -366,7 +380,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		break;
 	case LCP_Decimal32: {
 		strcat(buffer, equality);
-		int32_t val_u32 = lcp_getInt32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
+		int32_t val_u32 = lcp_getInt32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		int dec = 0;
 		if (entry->Descriptor && entry->EntryType == LCP_Uint32) {
 			dec = ((LCP_Decimal32_t*) entry->Descriptor)->Decimals;
@@ -390,22 +404,37 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		}
 	}
 		break;
+	case LCP_Bool:
 	case LCP_Enum: {
-		uint32_t val_u32 = lcp_getUint32(getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
-		LCP_Enum_t *enumDesc = (LCP_Enum_t*) entry->Descriptor;
+		uint32_t val_u32 = lcp_getUint32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 
 		const char *position = 0;
-		if (enumDesc->Min <= val_u32) {
-			//value should be above minimum
-			position = entry->TextData;
-			uint32_t minval = val_u32 - enumDesc->Min;
-			for (uint32_t i = 0; (i < minval); i++) {
+		if (entry->EntryType == LCP_Bool) {
+			position = off_on;
+			if (entry->TextData) {
+				position = entry->TextData;
+			}
+			if (val_u32) {
 				position = strchr(position, '\n'); //look for buffer specified by val index
-				if (position == 0)
-					break;
-				position++; //skip '\n'
+				if (position != 0) {
+					position++; //skip '\n'
+				}
+			}
+		} else {
+			LCP_Enum_t *enumDesc = (LCP_Enum_t*) entry->Descriptor;
+			if (enumDesc && (enumDesc->Min <= val_u32)) {
+				//value should be above minimum
+				position = entry->TextData;
+				uint32_t minval = val_u32 - enumDesc->Min;
+				for (uint32_t i = 0; (i < minval); i++) {
+					position = strchr(position, '\n'); //look for buffer specified by val index
+					if (position == 0)
+						break;
+					position++; //skip '\n'
+				}
 			}
 		}
+
 		if (position == 0) {
 			sprintf(buffer + strlen(buffer), "%" PRIu32, val_u32);
 		} else {
@@ -420,7 +449,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 
 #ifdef LEVCAN_USE_FLOAT
 	case LCP_Float: {
-		float fval = *(float*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		float fval = *(float*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, fval);
 		} else {
@@ -431,7 +460,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 #endif
 #ifdef LEVCAN_USE_DOUBLE
 	case LCP_Double: {
-		double dval = *(double*) getValueByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		double dval = *(double*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, dval);
 		} else {
@@ -446,4 +475,305 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	strcat(buffer, newline);
 
 	return;
+}
+
+/// Parses string line and returns it's directory or index
+const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input, int16_t *directory, int16_t *index) {
+	if (index == 0 || directory == 0 || input == 0 || node == 0)
+		return 0;
+	int16_t dir = *directory;
+	int16_t indx = -1;
+
+	//skip first spaces
+	const char *line = skipspaces(input);
+	int linelength = strcspn(line, "\n\r");
+	if (linelength > 0) {
+		if (*line == '[') {
+			//[directory name]
+			line++; //skip '['
+			line = skipspaces(line); //skip possible spaces at begin
+			//directory detected, calculate distance to end
+			dir = LCP_IsDirectory((LCPS_Directory_t*) node->Directories, node->DirectoriesSize, line);
+			//too short or large, or new line? wrong
+			if (dir >= 0) {
+				indx = -1; //reset parameter
+			} else {
+				//Directory not found
+			}
+
+		} else if ((dir >= 0) && (*line != '#') && (*line != 0) && (*line != '\n')) {
+			//parameter = value
+			//Vasya = Pupkin #comment
+			int endofname = strcspn(line, endline);
+			indx = LCP_IsParameter(&((LCPS_Directory_t*) node->Directories)[dir], line);
+			//too short or large, or new line? wrong
+			if (indx > 0 && line[endofname] == '=') {
+				//endofname is here '='
+				line += endofname + 1;
+				//Pupkin #comment \n
+			}
+		}
+	} else
+		return 0;
+	*index = indx;
+	*directory = dir;
+	//go to new line
+	return line;
+}
+
+/// Returns directory index if valid, -1 if not found
+/// @param directories
+/// @param dirsize
+/// @param s
+/// @return
+int16_t LCP_IsDirectory(const LCPS_Directory_t directories[], uint16_t dirsize, const char *s) {
+	//index [0] is directory entry, dont scan
+	int searchlen = strcspn(s, endlinedir);
+	//remove space ending
+	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
+		;
+	for (uint16_t i = 0; i < dirsize; i++) {
+		const char *name = directories[i].Name;
+		if (name && strncmp(name, s, searchlen) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/// Returns parameter index if valid, -1 if not found
+/// @param directory
+/// @param s
+/// @return
+int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s) {
+	//index [0] is directory entry, dont scan
+	int searchlen = strcspn(s, endline);
+	//remove space ending
+	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
+		;
+	for (uint16_t i = 1; i < directory->Size; i++) {
+		//todo carefully check types
+		const char *name = directory->Entries[i].Name;
+		if (name && (strncmp(name, s, searchlen) == 0)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/// Tries to get value for specified parameter with string value
+/// @param parameter
+/// @param value output
+/// @return
+LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s, char **out) {
+	int32_t integer = 0;
+	if (parameter == 0 || s == 0 || out == 0) {
+		return LC_DataError;
+	}
+	int type = parameter->EntryType;
+	//skip what is not need parsing
+	if (parameter->VarSize == 0 || type == LCP_Label) {
+		return LC_Ok;
+	}
+
+	s = skipspaces(s);
+	int length = strcspn(s, endline);
+	int varsize = parameter->VarSize;
+	LC_Return_t result = LC_Ok;
+
+	switch (type) {
+	case LCP_String: {
+	}
+		break;
+	case LCP_Bitfield32: {
+
+	}
+		break;
+	case LCP_Uint32: {
+		//negative check!
+		s = skipspaces(s);
+		uint32_t u32 = 0;
+		if (*s != '-') {
+			u32 = strtoul(s, out, 0);
+		}
+
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Uint32_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Uint32_t *desc = (LCP_Uint32_t*) parameter->Descriptor;
+		lcp_setUint32((void*) parameter->Variable, varsize, u32);
+		result = lcp_u32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+	case LCP_Uint64: {
+		uint64_t u64 = strtoull(s, out, 0);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Uint64_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Uint64_t *desc = (LCP_Uint64_t*) parameter->Descriptor;
+		*((uint64_t*) parameter->Variable) = u64;
+		result = lcp_u64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+	case LCP_Int32: {
+		int32_t i32 = strtol(s, out, 0);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Int32_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Int32_t *desc = (LCP_Int32_t*) parameter->Descriptor;
+		lcp_setInt32((void*) parameter->Variable, varsize, i32);
+		result = lcp_i32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+	case LCP_Int64: {
+		int64_t i64 = strtoll(s, out, 0);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Int64_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Int64_t *desc = (LCP_Int64_t*) parameter->Descriptor;
+		*((int64_t*) parameter->Variable) = i64;
+		result = lcp_i64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+
+	}
+		break;
+	case LCP_Decimal32: {
+#ifdef LEVCAN_USE_FLOAT
+		float temp = strtof(s, out);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Decimal32_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Decimal32_t *ddesc = (LCP_Decimal32_t*) parameter->Descriptor;
+		integer = temp * lcp_pow10i(ddesc->Decimals);
+		lcp_setInt32((void*) parameter->Variable, varsize, integer);
+		result = lcp_i32inRange((void*) parameter->Variable, varsize, ddesc->Min, ddesc->Max);
+
+#endif
+	}
+		break;
+	case LCP_Bool:
+	case LCP_Enum: {
+		const char *haystack = parameter->TextData;
+		if (type == LCP_Bool) {
+			haystack = off_on;
+		} else {
+			if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Enum_t)) {
+				result = LC_ObjectError;
+				break;
+			}
+		}
+		//end is comment or newline
+		int haylen = strlen(haystack);
+		//remove space ending
+		for (; length > 0 && isblank(s[length - 1]); length--)
+			;
+		int found = 0;
+		//look in haystack
+		int h = 0;
+		while (h < haylen && length > 0) {
+			//compare new line
+			if (strncmp(&haystack[h], s, length) == 0) {
+				found = 1;
+				break;
+			}
+			//count till new line
+			for (; h < haylen; h++) {
+				//compare needle
+				if (haystack[h] == '\n') {
+					integer++;
+					h++;
+					break;
+				}
+			}
+		}
+		if (found) {
+			lcp_setUint32((void*) parameter->Variable, varsize, integer);
+			if (type == LCP_Bool) {
+				result = lcp_u32inRange((void*) parameter->Variable, varsize, 0, 1);
+			} else {
+				LCP_Enum_t *desc = (LCP_Enum_t*) parameter->Descriptor;
+				//todo min-size logic?
+				uint32_t max = desc->Size > 0 ? desc->Min + desc->Size - 1 : desc->Min;
+				result = lcp_u32inRange((void*) parameter->Variable, varsize, desc->Min, max);
+			}
+		}
+	}
+		break;
+
+#ifdef LEVCAN_USE_FLOAT
+	case LCP_Float: {
+		float f32 = strtof(s, out);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Float_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Float_t *desc = (LCP_Float_t*) parameter->Descriptor;
+		*((float*) parameter->Variable) = f32;
+		result = lcp_f32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+#endif
+#ifdef LEVCAN_USE_DOUBLE
+	case LCP_Double: {
+		double d64 = strtod(s, out);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Double_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Double_t *desc = (LCP_Double_t*) parameter->Descriptor;
+		*((double*) parameter->Variable) = d64;
+		result = lcp_d64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+#endif
+	default:
+		break;
+	}
+	*out = s + length; //scroll to new line
+	return result;
+}
+
+const char* skipspaces(const char *s) {
+	for (; isspace(*s); s++)
+		;
+	return s;
 }
