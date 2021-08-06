@@ -140,6 +140,7 @@ LC_Return_t lcp_i64inRange(intptr_t *variable, uint16_t varSize, int64_t min, in
 uint32_t lcp_getUint32(intptr_t *variable, uint16_t varSize);
 void lcp_setUint32(intptr_t *variable, uint16_t varSize, uint32_t value);
 LC_Return_t lcp_u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, uint32_t max);
+LC_Return_t lcp_bitinRange(intptr_t *variable, uint16_t varSize, uint32_t mask);
 LC_Return_t lcp_u64inRange(intptr_t *variable, uint16_t varSize, uint64_t min, uint64_t max);
 
 LC_Return_t lcp_f32inRange(intptr_t *variable, uint16_t varSize, float min, float max);

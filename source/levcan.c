@@ -477,7 +477,7 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
 	//requests and timeout only TCP
 	if (object->Flags.TCP == 1 && (request || timeout)) {
-		if (request->EoM) {
+		if (request && request->EoM) {
 			//TX finished? delete this buffer anyway
 #ifdef LEVCAN_TRACE
 			//trace_printf("TX TCP finished:%d\n", object->Header.MsgID);
@@ -494,7 +494,7 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 			object->FlagsTotal = toDeleteMark;
 			return 0;
 		}
-		if (parity != request->Parity || timeout) {
+		if (timeout || (request && (parity != request->Parity))) {
 			// trace_printf("Request got invalid parity -\n");
 			if (object->Time_since_comm == 0)
 				return 0;    //avoid request spamming

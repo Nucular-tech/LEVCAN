@@ -351,21 +351,21 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		}
 	}
 		break;
-	case LCP_Uint64: {
-		uint64_t val_u64 = *(uint64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
-		if (entry->TextData) {
-			sprintf(buffer + strlen(buffer), entry->TextData, val_u64);
-		} else {
-			sprintf(buffer + strlen(buffer), "%" PRIu64, val_u64);
-		}
-	}
-		break;
 	case LCP_Int32: {
 		int32_t val_i32 = lcp_getInt32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, val_i32);
 		} else {
 			sprintf(buffer + strlen(buffer), "%" PRId32, val_i32);
+		}
+	}
+		break;
+	case LCP_Uint64: {
+		uint64_t val_u64 = *(uint64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		if (entry->TextData) {
+			sprintf(buffer + strlen(buffer), entry->TextData, val_u64);
+		} else {
+			sprintf(buffer + strlen(buffer), "%" PRIu64, val_u64);
 		}
 	}
 		break;
@@ -379,10 +379,9 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	}
 		break;
 	case LCP_Decimal32: {
-		strcat(buffer, equality);
 		int32_t val_u32 = lcp_getInt32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		int dec = 0;
-		if (entry->Descriptor && entry->EntryType == LCP_Uint32) {
+		if (entry->Descriptor) {
 			dec = ((LCP_Decimal32_t*) entry->Descriptor)->Decimals;
 		}
 		char *tDataEnd = 0;
@@ -500,7 +499,7 @@ const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input,
 			} else {
 				//Directory not found
 			}
-
+			line += linelength;
 		} else if ((dir >= 0) && (*line != '#') && (*line != 0) && (*line != '\n')) {
 			//parameter = value
 			//Vasya = Pupkin #comment
@@ -511,7 +510,12 @@ const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input,
 				//endofname is here '='
 				line += endofname + 1;
 				//Pupkin #comment \n
+			} else {
+				line += linelength;
 			}
+		} else {
+			//comment or random text
+			line += linelength;
 		}
 	} else
 		return 0;
@@ -551,7 +555,7 @@ int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s) {
 	//remove space ending
 	for (; searchlen > 0 && isblank(s[searchlen - 1]); searchlen--)
 		;
-	for (uint16_t i = 1; i < directory->Size; i++) {
+	for (uint16_t i = 0; i < directory->Size; i++) {
 		//todo carefully check types
 		const char *name = directory->Entries[i].Name;
 		if (name && (strncmp(name, s, searchlen) == 0)) {
@@ -583,15 +587,33 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 
 	switch (type) {
 	case LCP_String: {
+
 	}
 		break;
 	case LCP_Bitfield32: {
+		//check for 0b1010101 match
+		if (s[0] != '0' && s[1] != 'b') {
+			result = LC_DataError;
+			break;
+		}
+		uint32_t u32 = 0;
+		u32 = strtoul(s + 2, out, 2);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Bitfield32_t)) {
+			result = LC_ObjectError;
+			break;
+		}
 
+		LCP_Bitfield32_t *desc = (LCP_Bitfield32_t*) parameter->Descriptor;
+		lcp_setUint32((void*) parameter->Variable, varsize, u32);
+		result = lcp_bitinRange((void*) parameter->Variable, varsize, desc->Mask);
 	}
 		break;
 	case LCP_Uint32: {
 		//negative check!
-		s = skipspaces(s);
 		uint32_t u32 = 0;
 		if (*s != '-') {
 			u32 = strtoul(s, out, 0);
@@ -611,22 +633,6 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		result = lcp_u32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
 	}
 		break;
-	case LCP_Uint64: {
-		uint64_t u64 = strtoull(s, out, 0);
-		if (s == *out) {
-			result = LC_DataError;
-			break;
-		}
-		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Uint64_t)) {
-			result = LC_ObjectError;
-			break;
-		}
-
-		LCP_Uint64_t *desc = (LCP_Uint64_t*) parameter->Descriptor;
-		*((uint64_t*) parameter->Variable) = u64;
-		result = lcp_u64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
-	}
-		break;
 	case LCP_Int32: {
 		int32_t i32 = strtol(s, out, 0);
 		if (s == *out) {
@@ -641,6 +647,23 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		LCP_Int32_t *desc = (LCP_Int32_t*) parameter->Descriptor;
 		lcp_setInt32((void*) parameter->Variable, varsize, i32);
 		result = lcp_i32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+	}
+		break;
+#ifdef LEVCAN_USE_INT64
+	case LCP_Uint64: {
+		uint64_t u64 = strtoull(s, out, 0);
+		if (s == *out) {
+			result = LC_DataError;
+			break;
+		}
+		if (parameter->Descriptor == 0 || parameter->DescSize != sizeof(LCP_Uint64_t)) {
+			result = LC_ObjectError;
+			break;
+		}
+
+		LCP_Uint64_t *desc = (LCP_Uint64_t*) parameter->Descriptor;
+		*((uint64_t*) parameter->Variable) = u64;
+		result = lcp_u64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
 	}
 		break;
 	case LCP_Int64: {
@@ -660,6 +683,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 
 	}
 		break;
+#endif
 	case LCP_Decimal32: {
 #ifdef LEVCAN_USE_FLOAT
 		float temp = strtof(s, out);
@@ -768,7 +792,9 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 	default:
 		break;
 	}
-	*out = s + length; //scroll to new line
+
+	*out = (char*) s + strcspn(s, newline); //scroll to new line
+	*out = skipspaces(*out);
 	return result;
 }
 

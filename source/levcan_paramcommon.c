@@ -27,7 +27,6 @@
 #include "levcan_paraminternal.h"
 #include "levcan_paramcommon.h"
 
-
 LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type) {
 	if (variable == 0 || varSize == 0)
 		return LC_DataError;	//invalid
@@ -53,11 +52,7 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 			return LC_DataError;
 		}
 		const LCP_Bitfield32_t *desc = (LCP_Bitfield32_t*) descriptor;
-		uint32_t value = lcp_getUint32(variable, varSize);
-		int outofrange = (~desc->Mask) & value;
-		value &= desc->Mask; //filter by mask
-		lcp_setUint32(variable, varSize, value);
-		return outofrange ? LC_OutOfRange : LC_Ok;
+		return lcp_bitinRange(variable, varSize, desc->Mask);
 	}
 		break;
 	case LCP_Int32: { //LCP_Int32_t
@@ -109,10 +104,10 @@ LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t 
 		if (descSize != sizeof(LCP_Double_t)) {
 			return LC_DataError;
 		}
-		const LCP_Double_t *desc = (LCP_Double_t*)descriptor;
+		const LCP_Double_t *desc = (LCP_Double_t*) descriptor;
 		return lcp_d64inRange(variable, varSize, desc->Min, desc->Max);
 	}
-	break;
+		break;
 #endif
 
 	}
@@ -202,6 +197,17 @@ LC_Return_t lcp_u32inRange(intptr_t *variable, uint16_t varSize, uint32_t min, u
 		return LC_OutOfRange;
 	}
 	return LC_Ok;
+}
+
+LC_Return_t lcp_bitinRange(intptr_t *variable, uint16_t varSize, uint32_t mask) {
+	if (varSize > sizeof(uint32_t))
+		return LC_DataError;
+	uint32_t value = lcp_getUint32(variable, varSize);
+
+	int outofrange = (~mask) & value;
+	value &= mask; //filter by mask
+	lcp_setUint32(variable, varSize, value);
+	return outofrange ? LC_OutOfRange : LC_Ok;
 }
 
 LC_Return_t lcp_i32inRange(intptr_t *variable, uint16_t varSize, int32_t min, int32_t max) {
@@ -319,9 +325,9 @@ int lcp_print_i32f(char *buffer, int32_t value, uint8_t decimals) {
 	return isize;
 }
 
+#define intsizetext 33
 /// Print binary value of uint32_t = 0b1010
 int lcp_print_u32b(char *buffer, uint32_t value) {
-	const int intsizetext = 33;
 	char bufBinary[intsizetext];
 	memset(bufBinary, 0, intsizetext);
 	*buffer++ = '0';
