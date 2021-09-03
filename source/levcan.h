@@ -153,6 +153,16 @@ enum {
 #define LEVCAN_SYS_OBJ_SIZ (LC_SYS_End - LC_SYS_NodeName)
 #endif
 
+typedef struct {
+	uint8_t Hour; //24H
+	uint8_t Minute;
+	uint8_t Second;
+	uint8_t WeekDay; //0=Monday ... 6=Sunday
+	uint8_t Date;
+	uint8_t Month;
+	uint16_t Year;
+} LC_SYS_DateTime_t;
+
 enum {
 	LCNodeState_Disabled, LCNodeState_NetworkDiscovery, LCNodeState_WaitingClaim, LCNodeState_Online
 };

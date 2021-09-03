@@ -60,7 +60,7 @@ LC_Return_t LC_FileClientInit(LC_NodeDescriptor_t *node) {
 #ifdef LEVCAN_USE_RTOS_QUEUE
 
 	initObject->Address = LC_QueueCreate(LEVCAN_MAX_OWN_NODES, sizeof(LC_ObjectData_t));
-	((lc_Extensions_t*)node->Extensions)->frxQueue = initObject->Address;
+	((lc_Extensions_t*) node->Extensions)->frxQueue = initObject->Address;
 
 	initObject->Attributes.Writable = 1;
 	initObject->Attributes.Queue = 1;
@@ -77,8 +77,8 @@ LC_Return_t LC_FileClientInit(LC_NodeDescriptor_t *node) {
 
 #endif
 #endif
-	((lc_Extensions_t*)node->Extensions)->fnode = LC_Broadcast_Address;
-	((lc_Extensions_t*)node->Extensions)->fpos = 0;
+	((lc_Extensions_t*) node->Extensions)->fnode = LC_Broadcast_Address;
+	((lc_Extensions_t*) node->Extensions)->fpos = 0;
 	return LC_Ok;
 }
 #ifndef LEVCAN_USE_RTOS_QUEUE
@@ -122,7 +122,7 @@ LC_FileResult_t LC_FileOpen(LC_NodeDescriptor_t *node, char *name, LC_FileAccess
 
 	//save server
 	//((lc_Extensions_t*)node->Extensions)->frxQueue
-	((lc_Extensions_t*)node->Extensions)->fnode = server_node;
+	((lc_Extensions_t*) node->Extensions)->fnode = server_node;
 	//create buffer
 	int datasize = sizeof(fOpOpen_t) + strlen(name) + 1;
 	char datasend[datasize];
@@ -134,9 +134,9 @@ LC_FileResult_t LC_FileOpen(LC_NodeDescriptor_t *node, char *name, LC_FileAccess
 	openf->Mode = mode;
 	LC_FileResult_t ret = lc_client_sendwait(node, openf, datasize, 0);
 	if (ret != LC_FR_Ok)
-		((lc_Extensions_t*)node->Extensions)->fnode = LC_Broadcast_Address; //reset server
+		((lc_Extensions_t*) node->Extensions)->fnode = LC_Broadcast_Address; //reset server
 	else
-		((lc_Extensions_t*)node->Extensions)->fpos = 0;
+		((lc_Extensions_t*) node->Extensions)->fpos = 0;
 	return ret;
 }
 
@@ -156,10 +156,10 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 	*br = 0;
 	attempt = 0;
 	//look for any server node
-	if (((lc_Extensions_t*)node->Extensions)->fnode == LC_Broadcast_Address)
+	if (((lc_Extensions_t*) node->Extensions)->fnode == LC_Broadcast_Address)
 		return LC_FR_FileNotOpened;
 	else
-		server = LC_GetNode(node, ((lc_Extensions_t*)node->Extensions)->fnode);
+		server = LC_GetNode(node, ((lc_Extensions_t*) node->Extensions)->fnode);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
 		return LC_FR_NodeOffline;
@@ -173,11 +173,11 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 	rec.Address = &readf;
 	rec.Size = sizeof(fOpRead_t);
 	LC_FileResult_t ret = LC_FR_Ok;
-	volatile fRead_t *rxtoread = &((lc_Extensions_t*)node->Extensions)->rxtoread;
+	volatile fRead_t *rxtoread = &((lc_Extensions_t*) node->Extensions)->rxtoread;
 
 	for (uint32_t position = 0; position < btr;) {
 		uint32_t toreadnow = btr - position;
-		uint32_t globalpos = position + ((lc_Extensions_t*)node->Extensions)->fpos;
+		uint32_t globalpos = position + ((lc_Extensions_t*) node->Extensions)->fpos;
 		//finish?
 		if (toreadnow == 0)
 			return LC_Ok;
@@ -194,8 +194,8 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 		readf.Position = globalpos; //add global position
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
-						LC_QueueReset(((lc_Extensions_t* ) node->Extensions)->frxQueue);
-				#endif
+		LC_QueueReset(((lc_Extensions_t* ) node->Extensions)->frxQueue);
+#endif
 		LC_Return_t sr = LC_SendMessage(node, &rec, LC_SYS_FileClient);
 		//send error?
 		if (sr) {
@@ -208,16 +208,16 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 			break;
 		}
 #ifdef LEVCAN_USE_RTOS_QUEUE
-						LC_ObjectData_t obj_data = { 0 };
-						//wait for receive
-						if (LC_QueueReceive(((lc_Extensions_t* ) node->Extensions)->frxQueue, &obj_data, LEVCAN_FILE_TIMEOUT)) {
-							fOpData_t *op_data = (fOpData_t*) obj_data.Data;
-							if (op_data->Operation == fOpData) {
-								processReceivedData(rxtoread, op_data, obj_data.Size);
-								lcfree(obj_data.Data);
-							}
-						}
-				#else
+		LC_ObjectData_t obj_data = { 0 };
+		//wait for receive
+		if (LC_QueueReceive(((lc_Extensions_t* ) node->Extensions)->frxQueue, &obj_data, LEVCAN_FILE_TIMEOUT)) {
+			fOpData_t *op_data = (fOpData_t*) obj_data.Data;
+			if (op_data->Operation == fOpData) {
+				processReceivedData(rxtoread, op_data, obj_data.Size);
+				lcfree(obj_data.Data);
+			}
+		}
+#else
 		//wait 500ms
 		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
 			lcdelay(1);
@@ -248,7 +248,7 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 		}
 	}
 	//reset buffer
-	((lc_Extensions_t*)node->Extensions)->fpos += *br;
+	((lc_Extensions_t*) node->Extensions)->fpos += *br;
 	rxtoread->Buffer = 0;
 	return ret;
 }
@@ -289,7 +289,7 @@ LC_FileResult_t LC_FileWrite(LC_NodeDescriptor_t *node, const char *buffer, uint
 
 	for (uint32_t position = 0; position < btw;) {
 		uint32_t towritenow = btw - position;
-		uint32_t globalpos = position + ((lc_Extensions_t*)node->Extensions)->fpos;
+		uint32_t globalpos = position + ((lc_Extensions_t*) node->Extensions)->fpos;
 
 		if (towritenow > LEVCAN_FILE_DATASIZE - sizeof(fOpData_t))
 			towritenow = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
@@ -321,7 +321,7 @@ LC_FileResult_t LC_FileWrite(LC_NodeDescriptor_t *node, const char *buffer, uint
 			break;
 		}
 	}
-	((lc_Extensions_t*)node->Extensions)->fpos += *bw;
+	((lc_Extensions_t*) node->Extensions)->fpos += *bw;
 	return ret;
 }
 
@@ -398,7 +398,7 @@ LC_FileResult_t LC_FileLseek(LC_NodeDescriptor_t *node, uint32_t position) {
 	fOpAck_t ask_result = { 0 };
 	LC_FileResult_t result = lc_client_sendwait(node, &lseekf, sizeof(fOpLseek_t), &ask_result);
 	if (ask_result.Operation == fOpAck)
-		((lc_Extensions_t*)node->Extensions)->fpos = ask_result.Position; //update position
+		((lc_Extensions_t*) node->Extensions)->fpos = ask_result.Position; //update position
 	return result;
 }
 
@@ -406,7 +406,7 @@ LC_FileResult_t LC_FileLseek(LC_NodeDescriptor_t *node, uint32_t position) {
 /// @param sender_node Own network node
 /// @return Pointer to the open file.
 uint32_t LC_FileTell(LC_NodeDescriptor_t *node) {
-	return ((lc_Extensions_t*)node->Extensions)->fpos;
+	return ((lc_Extensions_t*) node->Extensions)->fpos;
 }
 
 /// Get file size
@@ -443,26 +443,26 @@ LC_FileResult_t LC_FileClose(LC_NodeDescriptor_t *node, uint8_t server_node) {
 	LC_NodeShortName_t server;
 
 	//this node may be already closed here, but let it try again
-	if (((lc_Extensions_t*)node->Extensions)->fnode == LC_Broadcast_Address) {
+	if (((lc_Extensions_t*) node->Extensions)->fnode == LC_Broadcast_Address) {
 		//incoming server known?
 		if (server_node == LC_Broadcast_Address)
 			server = LC_FindFileServer(node, 0); //search
 		else
 			server = LC_GetNode(node, server_node); //get it
 	} else
-		server = LC_GetNode(node, ((lc_Extensions_t*)node->Extensions)->fnode);
+		server = LC_GetNode(node, ((lc_Extensions_t*) node->Extensions)->fnode);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address) {
-		((lc_Extensions_t*)node->Extensions)->fnode = LC_Broadcast_Address; //reset server anyway
+		((lc_Extensions_t*) node->Extensions)->fnode = LC_Broadcast_Address; //reset server anyway
 		return LC_FR_NodeOffline;
 	}
-	((lc_Extensions_t*)node->Extensions)->fnode = server.NodeID;
+	((lc_Extensions_t*) node->Extensions)->fnode = server.NodeID;
 	//create buffer
 	fOpOperation_t closef;
 	closef.Operation = fOpClose;
 	LC_FileResult_t result = lc_client_sendwait(node, &closef, sizeof(fOpOperation_t), 0);
 	//reset server
-	((lc_Extensions_t*)node->Extensions)->fnode = LC_Broadcast_Address;
+	((lc_Extensions_t*) node->Extensions)->fnode = LC_Broadcast_Address;
 	return result;
 }
 
@@ -471,10 +471,10 @@ LC_NodeShortName_t LC_FileGetServer(LC_NodeDescriptor_t *node) {
 	LC_NodeShortName_t server;
 
 	//look for any server node
-	if (((lc_Extensions_t*)node->Extensions)->fnode == LC_Broadcast_Address) {
+	if (((lc_Extensions_t*) node->Extensions)->fnode == LC_Broadcast_Address) {
 		return nullname;
 	} else
-		server = LC_GetNode(node, ((lc_Extensions_t*)node->Extensions)->fnode);
+		server = LC_GetNode(node, ((lc_Extensions_t*) node->Extensions)->fnode);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
 		return nullname;
@@ -518,10 +518,10 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 	((lc_Extensions_t*)node->Extensions)->rxack = (fOpAck_t ) { 0 };
 #endif
 	//look for any server node
-	if (((lc_Extensions_t*)node->Extensions)->fnode == LC_Broadcast_Address)
+	if (((lc_Extensions_t*) node->Extensions)->fnode == LC_Broadcast_Address)
 		return LC_FR_FileNotOpened;
 	else
-		server = LC_GetNode(node, ((lc_Extensions_t*)node->Extensions)->fnode);
+		server = LC_GetNode(node, ((lc_Extensions_t*) node->Extensions)->fnode);
 	//checks
 	if (server.FileServer == 0 || server.NodeID == LC_Broadcast_Address)
 		return LC_FR_NodeOffline;
@@ -535,8 +535,8 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 	uint16_t attempt = 0;
 	for (attempt = 0; attempt < 3; attempt++) {
 #ifdef LEVCAN_USE_RTOS_QUEUE
-						LC_QueueReset(((lc_Extensions_t* ) node->Extensions)->frxQueue);
-				#endif
+		LC_QueueReset(((lc_Extensions_t* ) node->Extensions)->frxQueue);
+#endif
 		LC_Return_t sr = LC_SendMessage(node, &rec, LC_SYS_FileClient);
 		//send error?
 		if (sr) {
@@ -548,22 +548,22 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 		}
 		//wait
 #ifdef LEVCAN_USE_RTOS_QUEUE
-						LC_ObjectData_t ack_data = { 0 };
-						//wait for receive
-						if (LC_QueueReceive(((lc_Extensions_t* ) node->Extensions)->frxQueue, &ack_data, LEVCAN_FILE_TIMEOUT)) {
-							if (sizeof(fOpAck_t) == ack_data.Size) {
-								//convert data to ack type
-								fOpAck_t ack = *((fOpAck_t*) ack_data.Data);
-								if (ack.Operation == fOpAck) {
-									if (askOut)
-										*askOut = ack;
-									lcfree(ack_data.Data);
-									return ack.Error; //Finish!
-								}
-							}
-							lcfree(ack_data.Data);
-						}
-				#else
+		LC_ObjectData_t ack_data = { 0 };
+		//wait for receive
+		if (LC_QueueReceive(((lc_Extensions_t* ) node->Extensions)->frxQueue, &ack_data, LEVCAN_FILE_TIMEOUT)) {
+			if (sizeof(fOpAck_t) == ack_data.Size) {
+				//convert data to ack type
+				fOpAck_t ack = *((fOpAck_t*) ack_data.Data);
+				if (ack.Operation == fOpAck) {
+					if (askOut)
+						*askOut = ack;
+					lcfree(ack_data.Data);
+					return ack.Error; //Finish!
+				}
+			}
+			lcfree(ack_data.Data);
+		}
+#else
 		for (int time = 0; time < LEVCAN_FILE_TIMEOUT; time++) {
 			lcdelay(1);
 			if (((lc_Extensions_t*)node->Extensions)->rxack.Operation == fOpAck) {

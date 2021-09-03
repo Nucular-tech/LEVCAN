@@ -80,32 +80,6 @@ LC_Return_t LCP_RequestDirectory(LC_NodeDescriptor_t *node, uint8_t from_node, u
 
 	memset(out_directory, 0, sizeof(*out_directory));
 	return requestData(node, from_node, directory_index, 0, out_directory, sizeof(*out_directory), lcp_reqDirectoryInfo);
-
-	/*
-	 LC_Return_t result = LC_Ok;
-	 if (error.ErrorCode) {
-	 result = error.ErrorCode;
-	 //some errors happened, clean up everything
-	 if (bufferDir.Name) {
-	 lcfree((void*)bufferDir.Name);
-	 }
-
-	 }
-	 else {
-	 //check received data
-	 if (directdata.NameSize > 0) {
-	 directdata.NameSize--; //skip 0s
-	 }
-	 if (nameDataSize != directdata.NameSize) {
-	 //text error
-	 }
-	 if (bufferDir.DirectoryIndex != directory_index) {
-	 //index error
-	 }
-	 }
-	 //thread safe
-	 *out_directory = bufferDir;
-	 return result;*/
 }
 
 LC_Return_t LCP_RequestValue(LC_NodeDescriptor_t *node, uint8_t from_node, uint16_t directory_index, uint16_t entry_index, intptr_t *outVariable, uint16_t varSize) {
