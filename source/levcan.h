@@ -158,7 +158,7 @@ typedef struct {
 	uint8_t Minute;
 	uint8_t Second;
 	uint8_t WeekDay; //0=Monday ... 6=Sunday
-	uint8_t Date;
+	uint8_t Day;
 	uint8_t Month;
 	uint16_t Year;
 } LC_SYS_DateTime_t;

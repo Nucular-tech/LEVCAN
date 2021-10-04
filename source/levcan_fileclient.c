@@ -47,9 +47,9 @@ void proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data
 #endif
 //private variables
 #ifdef LEVCAN_BUFFER_FILEPRINTF
-				char lc_printf_buffer[LEVCAN_FILE_DATASIZE - sizeof(fOpData_t)];
-				uint32_t lc_printf_size = 0;
-				#endif
+char lc_printf_buffer[LEVCAN_FILE_DATASIZE - sizeof(fOpData_t)];
+uint32_t lc_printf_size = 0;
+#endif
 
 LC_Return_t LC_FileClientInit(LC_NodeDescriptor_t *node) {
 #ifdef LEVCAN_FILECLIENT
@@ -341,29 +341,29 @@ LC_FileResult_t LC_FilePrintf(LC_NodeDescriptor_t *node, const char *format, ...
 	// Print to the local buffer
 	size = vsnprintf(buf, sizeof(buf), format, ap);
 #ifdef LEVCAN_BUFFER_FILEPRINTF
-					char *bufref = buf;
-					uint32_t copysize = 0;
-					uint32_t maxsize = 0;
-					do {
-						//send only full buffer
-						if (lc_printf_size == sizeof(lc_printf_buffer)) {
-							result = LC_FileWrite(node, lc_printf_buffer, lc_printf_size, &lc_printf_size);
-							lc_printf_size = 0;
-						}
-						//fill buffer
-						if (size > 0) {
-							maxsize = sizeof(lc_printf_buffer) - lc_printf_size;
-							if (size > maxsize)
-								copysize = maxsize;
-							else
-								copysize = size;
-							memcpy(&lc_printf_buffer[lc_printf_size], bufref, copysize);
-							lc_printf_size += copysize;
-							size -= copysize;
-							bufref += copysize;
-						}
-					} while (lc_printf_size == sizeof(lc_printf_buffer));
-				#else
+	char *bufref = buf;
+	uint32_t copysize = 0;
+	uint32_t maxsize = 0;
+	do {
+		//send only full buffer
+		if (lc_printf_size == sizeof(lc_printf_buffer)) {
+			result = LC_FileWrite(node, lc_printf_buffer, lc_printf_size, &lc_printf_size);
+			lc_printf_size = 0;
+		}
+		//fill buffer
+		if (size > 0) {
+			maxsize = sizeof(lc_printf_buffer) - lc_printf_size;
+			if (size > maxsize)
+				copysize = maxsize;
+			else
+				copysize = size;
+			memcpy(&lc_printf_buffer[lc_printf_size], bufref, copysize);
+			lc_printf_size += copysize;
+			size -= copysize;
+			bufref += copysize;
+		}
+	} while (lc_printf_size == sizeof(lc_printf_buffer));
+#else
 	if (size > 0) {
 		// Transfer the buffer to the server
 		result = LC_FileWrite(node, buf, size, &size);
@@ -374,16 +374,16 @@ LC_FileResult_t LC_FilePrintf(LC_NodeDescriptor_t *node, const char *format, ...
 }
 
 #ifdef LEVCAN_BUFFER_FILEPRINTF
-				LC_FileResult_t LC_FilePrintFlush(LC_NodeDescriptor_t *node) {
-					LC_FileResult_t res = 0;
-					uint32_t size = 0;
+LC_FileResult_t LC_FilePrintFlush(LC_NodeDescriptor_t *node) {
+	LC_FileResult_t res = 0;
+	uint32_t size = 0;
 
-					if (lc_printf_size > 0)
-						res = LC_FileWrite(node, lc_printf_buffer, lc_printf_size, &size);
-					lc_printf_size = 0;
-					return res;
-				}
-				#endif
+	if (lc_printf_size > 0)
+		res = LC_FileWrite(node, lc_printf_buffer, lc_printf_size, &size);
+	lc_printf_size = 0;
+	return res;
+}
+#endif
 
 ///  Move read/write pointer, Expand size
 /// @param sender_node Own network node
@@ -506,7 +506,7 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 	LC_NodeShortName_t server;
 
 	if (node == 0 || node->Extensions == 0
-#ifdef LEVCAN_LEVCAN_USE_RTOS_QUEUE
+#ifdef LEVCAN_USE_RTOS_QUEUE
 						|| ((lc_Extensions_t*)node->Extensions)->frxQueue == 0
 				#endif
 			) {
