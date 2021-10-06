@@ -131,7 +131,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 							//todo fix static
 #ifdef LEVCAN_MEM_STATIC
 							static lc_entry_data_t entrydataStatic;
-							lc_entry_data_t* entrydata = &entrydataStatic
+							lc_entry_data_t* entrydata = &entrydataStatic;
 #else //dynamic mem
 							lc_entry_data_t *entrydata = 0;
 							entrydata = lcmalloc(sizeof(lc_entry_data_t));
@@ -193,7 +193,6 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 								sendRec.Attributes.Cleanup = 0;
 								sendRec.Size = entry->VarSize;
 								status = LC_SendMessage(node, &sendRec, LC_SYS_ParametersValue);
-
 								sendResponce = 0;
 							} else if (request.Command == lcp_reqVariable) {
 								//value request only. this needs a access error response

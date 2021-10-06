@@ -254,7 +254,8 @@ uint8_t hashMultiplicative(const uint8_t *input, uint8_t len, uint8_t start) {
 }
 
 void LC_ReceiveHandler(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, uint32_t *data, uint8_t length) {
-
+	if (node == 0)
+		return;
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	YieldNeeded_t yield = 0;
 	//packing

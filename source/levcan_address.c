@@ -28,20 +28,20 @@
 #ifndef LEVCAN_MIN_BYTE_SIZE
 #define LEVCAN_MIN_BYTE_SIZE 1
 #endif
- //### Private functions ###
+//### Private functions ###
 void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t nodeName, uint16_t mode);
 int16_t lc_compareNodes(LC_NodeShortName_t a, LC_NodeShortName_t b);
 uint16_t lc_searchIndexCollision(LC_NodeDescriptor_t *node, uint16_t nodeID);
 void lc_claimFreeID(LC_NodeDescriptor_t *node);
-LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t* node, uint16_t target);
+LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t *node, uint16_t target);
 
-extern LC_Return_t lc_sendDataToQueue(LC_NodeDescriptor_t* node, LC_HeaderPacked_t hdr, uint32_t data[], uint8_t length);
+extern LC_Return_t lc_sendDataToQueue(LC_NodeDescriptor_t *node, LC_HeaderPacked_t hdr, uint32_t data[], uint8_t length);
 //### Private variables
 
 LC_RemoteNodeCallback_t lc_addressCallback = 0;
 
-LC_Return_t LC_AddressInit(LC_NodeDescriptor_t* node) {
+LC_Return_t LC_AddressInit(LC_NodeDescriptor_t *node) {
 	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
 	if (initObject == 0)
 		return LC_InitError;
@@ -54,7 +54,7 @@ LC_Return_t LC_AddressInit(LC_NodeDescriptor_t* node) {
 	return LC_Ok;
 }
 
-void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
+void LC_AddressManager(LC_NodeDescriptor_t *node, uint32_t time) {
 	if (node == 0 || node->State == LCNodeState_Disabled)
 		return;
 	//send every node id
@@ -79,14 +79,12 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 			trace_printf("Discovery finish id:%d\n", node->ShortName.NodeID);
 #endif
 		}
-	}
-	else if (node->ShortName.NodeID == LC_Null_Address) {
+	} else if (node->ShortName.NodeID == LC_Null_Address) {
 		//we've lost id, get new one
 		//look for free id
 		node->LastTXtime = 0;
 		lc_claimFreeID(node);
-	}
-	else if (node->ShortName.NodeID < LC_Broadcast_Address) {
+	} else if (node->ShortName.NodeID < LC_Broadcast_Address) {
 
 		if (node->State == LCNodeState_WaitingClaim) {
 			node->LastTXtime += time;
@@ -98,8 +96,7 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 				trace_printf("We are online ID:%d\n", node->ShortName.NodeID);
 #endif
 			}
-		}
-		else if (node->State == LCNodeState_Online) {
+		} else if (node->State == LCNodeState_Online) {
 			static int alone = 0;
 			//we are online! why nobody asking for it?
 			node->LastTXtime += time;
@@ -112,9 +109,13 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 				}
 				alone = 3000;
 #endif
+			} else {
+#ifdef LEVCAN_TRACE
+				if (alone) {
+					alone -= time;
+				}
+#endif
 			}
-			else if (alone)
-				alone -= time;
 		}
 	}
 
@@ -138,8 +139,7 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 						lc_addressCallback(node_table[i].ShortName, i, LC_AdressDeleted);
 					}
 					node_table[i].ShortName.NodeID = LC_Broadcast_Address;
-				}
-				else if (node_table[i].LastRXtime > 1000) {
+				} else if (node_table[i].LastRXtime > 1000) {
 					//ask node, is it online?
 					lc_sendDiscoveryRequest(node, node_table[i].ShortName.NodeID);
 				}
@@ -152,8 +152,8 @@ void LC_AddressManager(LC_NodeDescriptor_t* node, uint32_t time) {
 }
 
 void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size) {
-	(void)size; //no warnings
-	(void)node;
+	(void) size; //no warnings
+	(void) node;
 
 	if (header.Request) {
 		//TODO what to do with null?
@@ -164,8 +164,7 @@ void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void 
 					node->LastTXtime = 0;    //reset online timer
 				lc_addressClaimHandler(node, node->ShortName, LC_TX);
 			}
-		}
-		else {
+		} else {
 			if (node->ShortName.NodeID == header.Target && node->State >= LCNodeState_WaitingClaim) {
 				if (node->State == LCNodeState_Online)
 					node->LastTXtime = 0;    //reset online timer
@@ -173,12 +172,11 @@ void lc_processAddressClaim(LC_NodeDescriptor_t *node, LC_Header_t header, void 
 
 			}
 		}
-	}
-	else {
+	} else {
 		//got some other claim
 		uint32_t *toui = data;
 		if (toui != 0)
-			lc_addressClaimHandler(node, (LC_NodeShortName_t) { .ToUint32[0] = toui[0], .ToUint32[1] = toui[1], .NodeID = header.Source }, LC_RX);
+			lc_addressClaimHandler(node, (LC_NodeShortName_t ) { .ToUint32[0] = toui[0], .ToUint32[1] = toui[1], .NodeID = header.Source }, LC_RX);
 	}
 }
 
@@ -187,9 +185,9 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 			.Priority = (~LC_Priority_Control) & 0x3,    //
 					.MsgID = LC_SYS_AddressClaimed,    //
 					.Target = LC_Broadcast_Address,    //
-					.Request = 0,.RTS_CTS = 1,.EoM = 1 };
+					.Request = 0, .RTS_CTS = 1, .EoM = 1 };
 	uint32_t data[2];
-	LC_NodeTableEntry_t* node_table = node->NodeTable->Table;
+	LC_NodeTableEntry_t *node_table = node->NodeTable->Table;
 	uint16_t nodeTableSize = node->NodeTable->TableSize;
 
 	int ownfound = 0;
@@ -201,39 +199,37 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 		 * or add it to table if there is none, or update existing if possible
 		 * */
 		if (claim.NodeID < LC_Null_Address) {
-	//		for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
-				if (node->ShortName.NodeID == claim.NodeID && node->State >= LCNodeState_WaitingClaim) {
-					//same address
-					ownfound = 1;
-					if (lc_compareNodes(node->ShortName, claim) != -1) {
-						idlost = 1;    //if we loose this id, we should try to add new nodeName to table
-						//less value - more priority. our not less, reset address
-						header.Source = LC_Null_Address;
-						//copy short name
-						data[0] = node->ShortName.ToUint32[0];
-						data[1] = node->ShortName.ToUint32[1];
-						//later we will find new id
-						node->ShortName.NodeID = LC_Null_Address;
-						node->State = LCNodeState_WaitingClaim;
-						LC_ConfigureFilters(node);
+			//		for (int i = 0; i < LEVCAN_MAX_OWN_NODES; i++) {
+			if (node->ShortName.NodeID == claim.NodeID && node->State >= LCNodeState_WaitingClaim) {
+				//same address
+				ownfound = 1;
+				if (lc_compareNodes(node->ShortName, claim) != -1) {
+					idlost = 1;    //if we loose this id, we should try to add new nodeName to table
+					//less value - more priority. our not less, reset address
+					header.Source = LC_Null_Address;
+					//copy short name
+					data[0] = node->ShortName.ToUint32[0];
+					data[1] = node->ShortName.ToUint32[1];
+					//later we will find new id
+					node->ShortName.NodeID = LC_Null_Address;
+					node->State = LCNodeState_WaitingClaim;
+					LC_ConfigureFilters(node);
 #ifdef LEVCAN_TRACE
 						trace_printf("We lost ID:%d\n", claim.NodeID);
 #endif
-					}
-					else {
-						//send own data to break other nodeName id
-						header.Source = node->ShortName.NodeID;
-						data[0] = node->ShortName.ToUint32[0];
-						data[1] = node->ShortName.ToUint32[1];
+				} else {
+					//send own data to break other nodeName id
+					header.Source = node->ShortName.NodeID;
+					data[0] = node->ShortName.ToUint32[0];
+					data[1] = node->ShortName.ToUint32[1];
 #ifdef LEVCAN_TRACE
 						trace_printf("Collision found ID:%d\n", claim.NodeID);
 #endif
-					}
-					//break;
 				}
-		//	}
-		}
-		else {
+				//break;
+			}
+			//	}
+		} else {
 			//someone lost his id?
 			for (int i = 0; i < nodeTableSize; i++)
 				if (lc_compareNodes(node_table[i].ShortName, claim) == 0) {
@@ -259,8 +255,7 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 					//look for first new position
 					if (empty == 255)
 						empty = i;
-				}
-				else if (node_table[i].ShortName.NodeID == claim.NodeID) {
+				} else if (node_table[i].ShortName.NodeID == claim.NodeID) {
 					//same address
 					int eql = lc_compareNodes(node_table[i].ShortName, claim);
 					if (eql == 1) {
@@ -275,8 +270,7 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 						trace_printf("Replaced ID: %d from S/N: 0x%04X to S/N: 0x%04X\n", node_table[i].ShortName.NodeID, node_table[i].ShortName.SerialNumber,
 							claim.SerialNumber);
 #endif
-					}
-					else if (eql == 0) {
+					} else if (eql == 0) {
 						//	trace_printf("Claim Update ID: %d\n", node_table[i].ShortName.NodeID);
 						node_table[i].LastRXtime = 0;
 					}
@@ -339,7 +333,7 @@ uint16_t lc_searchIndexCollision(LC_NodeDescriptor_t *node, uint16_t nodeID) {
 	//todo add online check?
 	//if (ownNode->State != LCNodeState_Disabled)
 	//	return 1;
-	LC_NodeTableEntry_t* node_table = node->NodeTable->Table;
+	LC_NodeTableEntry_t *node_table = node->NodeTable->Table;
 	int size = node->NodeTable->TableSize;
 	for (int i = 0; i < size; i++) {
 		if (node_table[i].ShortName.NodeID == nodeID)
@@ -360,7 +354,7 @@ int16_t lc_compareNodes(LC_NodeShortName_t a, LC_NodeShortName_t b) {
 		return 1;
 }
 
-void LC_ConfigureFilters(LC_NodeDescriptor_t* node) {
+void LC_ConfigureFilters(LC_NodeDescriptor_t *node) {
 
 	LC_HeaderPacked_t reg[2] = { 0 };
 	LC_HeaderPacked_t mask[2] = { 0 };
@@ -401,14 +395,13 @@ void LC_ConfigureFilters(LC_NodeDescriptor_t* node) {
 
 	if (active_node_exist) {
 		mask[0].MsgID = 0;    //match any brdcast
-	}
-	else
+	} else
 		mask[0].MsgID = 0x3F0;    //match for first 16 system messages
 
-	((LC_DriverCalls_t*)node->Driver)->Filter(reg, mask, active_filters);
+	((LC_DriverCalls_t*) node->Driver)->Filter(reg, mask, active_filters);
 }
 
-LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t* node, uint16_t target) {
+LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t *node, uint16_t target) {
 	LC_HeaderPacked_t hdr = { 0 };
 	hdr.MsgID = LC_SYS_AddressClaimed;
 	hdr.Priority = 0;
