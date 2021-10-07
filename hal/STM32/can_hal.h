@@ -87,9 +87,16 @@ void CAN_Start(void);
 
 void CAN_FiltersClear(void);
 void CAN_FilterEditOn(void);
-CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo);
-CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo);
+LC_Return_t CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo);
+LC_Return_t CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo);
+LC_Return_t CAN_CreateFilterMaskPosition(CAN_IR reg, CAN_IR mask, uint8_t fifo, uint8_t position);
 void CAN_FilterEditOff(void);
 
-CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length) ;
-CAN_Status CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length);
+LC_Return_t CAN_Send(CAN_IR index, uint32_t *data, uint16_t length);
+LC_Return_t CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length);
+
+LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
+LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count);
+LC_Return_t LC_HAL_TxHalfFull();
+extern volatile int CAN_ERR;
+extern void *LEVCAN_Node_Drv;
