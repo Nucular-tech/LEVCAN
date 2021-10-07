@@ -23,7 +23,7 @@
 
 #include <string.h>
 #include <math.h>
-#include "levcan.h"
+#include "can_hal.h"
 
 #ifdef  STM32F10X_MD
 #include "stm32f10x.h"
@@ -36,14 +36,49 @@
 #endif
 #include "can_hal.h"
 
-const float accuracy = 1.e-3;	// minimum required accuracy of the bit time
-uint8_t _getFreeTX();
-void receiveIRQ(void);
-extern void LC_ReceiveHandler(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
-extern void LC_TransmitHandler(void);
+// TYPEDEFS
+typedef struct {
+	LC_HeaderPacked_t Header;
+	uint32_t data[2];
+	uint8_t length;
+} can_packet_t;
+
+enum {
+	FIFO0, FIFO1,
+};
+
+//EXTERN FUNCTIONS
+extern void LC_ReceiveHandler(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 #ifdef TRACE
 extern int trace_printf(const char *format, ...);
 #endif
+
+//PRIVATE FUNCTIONS
+uint8_t _getFreeTX();
+uint8_t _anyTX();
+void receiveIRQ(void);
+void transmitIRQ(void);
+#ifndef LEVCAN_USE_RTOS_QUEUE
+void txFifoProceed(void);
+#endif
+
+//PRIVATE VARIABLES
+const float accuracy = 1.e-3;	// minimum required accuracy of the bit time
+volatile int CAN_ERR = 0;			
+#ifdef LEVCAN_USE_RTOS_QUEUE
+TaskHandle_t txCantask = 0;
+QueueHandle_t txCanqueue = 0;
+volatile uint32_t can_tx_cnt = 0;
+volatile uint32_t can_rx_cnt = 0;
+#else
+volatile uint32_t txFIFO_in = 0;
+volatile uint32_t txFIFO_out = 0;
+volatile can_packet_t txFIFO[LEVCAN_TX_SIZE];
+#endif
+
+//EXTERN VARIABLES
+void *LEVCAN_Node_Drv;
+
 /// Initialize CAN core using desired freq and bus freq
 /// @param PCLK - prescaler input clock
 /// @param bitrate_khzn - CAN bus bitrate
@@ -121,6 +156,7 @@ void CAN_InitFromClock(uint32_t PCLK, uint32_t bitrate_khz, uint16_t sjw, uint16
 /// Initialize CAN core
 /// @param BTR bitrate setting, calculate at http://www.bittiming.can-wiki.info/
 void CAN_Init(uint32_t BTR) {
+	//mask mode must match FF...F so nothing matches
 	CAN1->MCR |= CAN_MCR_RESET;
 	CAN1->MCR |= CAN_MCR_INRQ; //init can
 	while ((CAN1->MSR & CAN_MSR_INAK) == 0)
@@ -155,6 +191,16 @@ void CAN_Init(uint32_t BTR) {
 #endif
 	//run CAN
 	CAN_Start();
+	CAN_FiltersClear();
+	
+#ifdef LEVCAN_USE_RTOS_QUEUE
+	txCanqueue = xQueueCreate(TXQUEUE_SIZE, sizeof(can_packet_t));
+	xTaskCreate(txCanTask, "ctx", configMINIMAL_STACK_SIZE, NULL, OS_PRIORITY_HIGH, &txCantask);
+#else
+	txFIFO_in = 0;
+	txFIFO_out = 0;
+	memset((void*)&txFIFO, 0, sizeof(txFIFO));
+#endif		
 }
 
 /// Begin CAN operation
@@ -165,6 +211,7 @@ void CAN_Start(void) {
 
 	while ((CAN1->MSR & CAN_MSR_SLAK) != 0)
 		;
+	//TODO add timeout here to catch broken CAN driver
 	CAN1->MCR |= CAN_MCR_INRQ; //init can
 	while ((CAN1->MSR & CAN_MSR_INAK) == 0)
 		;
@@ -199,9 +246,9 @@ void CAN_FilterEditOn() {
 
 /// Filter single message
 /// @param index Message index to pass
-/// @param RTR Request or data?
+/// @param fifo Select fifo number
 /// @return Returns 1 if something wrong
-CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
+LC_Return_t CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 
 	//get position in filter bank
 	uint16_t filter_bank = 0;
@@ -250,7 +297,7 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 		}
 	}
 	if (filter_bank == CAN_FilterSize)
-		return CANH_QueueFull;
+		return LC_BufferFull;
 
 	if (reg.ExtensionID) {
 		if (relative == 0)
@@ -275,15 +322,15 @@ CAN_Status CAN_CreateFilterIndex(CAN_IR reg, uint16_t fifo) {
 		}
 	}
 
-	return CANH_Ok;
+	return LC_Ok;
 }
 
 /// Filter messages by mask
-/// @param index Message index to pass
+/// @param reg Message index to check
 /// @param mask Mask filtration for index, 1 - care, 0 - don't care
-/// @param RTR Request (1) or data (0)?
+/// @param fifo Select fifo number
 /// @return Returns 1 if something wrong
-CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
+LC_Return_t CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 #ifdef CAN_ForceEXID
 	reg.ExtensionID = 1;
 	mask.ExtensionID = 1;
@@ -327,9 +374,48 @@ CAN_Status CAN_CreateFilterMask(CAN_IR reg, CAN_IR mask, uint8_t fifo) {
 		}
 	}
 	if (filter_bank == CAN_FilterSize)
-		return CANH_QueueFull;
+		return LC_BufferFull;
 
-	return CANH_Ok;
+	return LC_Ok;
+}
+///  Filter messages by mask at specified position in filter bank
+/// @param reg Message index to check
+/// @param mask Mask filtration for index, 1 - care, 0 - don't care
+/// @param fifo Select fifo number
+/// @param position Filter bank position
+/// @return Returns 1 if something wrong
+LC_Return_t CAN_CreateFilterMaskPosition(CAN_IR reg, CAN_IR mask, uint8_t fifo, uint8_t position) {
+#ifdef CAN_ForceEXID
+	reg.ExtensionID = 1;
+	mask.ExtensionID = 1;
+#endif
+#ifdef CAN_ForceSTID
+	reg.ExtensionID=0;
+	mask.ExtensionID=1;
+#endif
+	if (position >= CAN_FilterSize)
+		return LC_BufferFull;
+	//get position in filter bank
+	uint8_t filter_bank = position;
+
+	//force active mode
+	FilterActivation |= (1 << filter_bank);
+	//filter size
+	CAN1->FS1R = (reg.ExtensionID << filter_bank) | (CAN1->FS1R & ~(1 << filter_bank)); //16b or 32b?
+	//FIFO
+	CAN1->FFA1R = (fifo << filter_bank) | (CAN1->FFA1R & ~(1 << filter_bank));
+	//mode - mask
+	CAN1->FM1R &= ~(1 << filter_bank);
+	//fill register with invalid value
+	if (reg.ExtensionID) { //only one here
+		CAN1->sFilterRegister[filter_bank].FR1 = reg.ToUint32 & ~1; //must match impossible
+		CAN1->sFilterRegister[filter_bank].FR2 = mask.ToUint32 & ~1; //must match impossible
+	} else {
+		CAN1->sFilterRegister[filter_bank].FR1 = ((reg.STID << 5) | (reg.Request << 4)) | (((mask.STID << 5) | (mask.Request << 4)) << 16);
+		CAN1->sFilterRegister[filter_bank].FR2 = 0xFFFFFFFF; //must match impossible
+	}
+
+	return LC_Ok;
 }
 
 void CAN_FilterEditOff() {
@@ -337,54 +423,80 @@ void CAN_FilterEditOff() {
 	CAN1->FMR &= ~CAN_FMR_FINIT;
 }
 
-CAN_Status CAN_Send(CAN_IR index, uint32_t *data, uint16_t length) {
+LC_Return_t CAN_Send(CAN_IR index, uint32_t *data, uint16_t length) {
 	uint8_t txBox;
 #ifdef CAN_ForceEXID
 	index.ExtensionID = 1;
 #endif
 #ifdef CAN_ForceSTID
-	index.ExtensionID=0;
+	index.ExtensionID = 0;
 #endif
-	//this is request? forward it to other function.
-//	if (index.Request)
-//		return CAN_SendIndex(index32);
-
 	if (length > 8)
-		return CANH_Fail;
+		return LC_DataError;
 
 	txBox = _getFreeTX();
 	if (txBox > 2)
-		return CANH_QueueFull;
+		return LC_BufferFull;
 
 	CAN1->sTxMailBox[txBox].TDTR = length; //data length
 	CAN1->sTxMailBox[txBox].TDLR = data[0];
 	CAN1->sTxMailBox[txBox].TDHR = data[1];
 	CAN1->sTxMailBox[txBox].TIR = index.ToUint32 | 1; //transmit
 
-	return CANH_Ok;
+	return LC_Ok;
 }
 
-CAN_Status CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length) {
-	CAN_Status status = CANH_QueueEmpty;
-//check is there something
+LC_Return_t CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length) {
+	LC_Return_t status = LC_BufferEmpty;
+	//check is there something
 	uint16_t fifo = 0;
-	while (status == CANH_QueueEmpty) {
+	while (status == LC_BufferEmpty) {
 		if ((CAN1->RF0R & CAN_RF0R_FMP0) == 0) {
 			if ((CAN1->RF1R & CAN_RF1R_FMP1) == 0)
-				return CANH_QueueEmpty; //nothing
+				return LC_BufferEmpty; //nothing
 			else {
 				fifo = 1;
-				status = CANH_Ok; //we found a valid message! yaay!
+				status = LC_Ok; //we found a valid message! yaay!
 			}
 		} else {
 			fifo = 0;
-			status = CANH_Ok; //we found a valid message! yaay!
+			status = LC_Ok; //we found a valid message! yaay!
 		}
 	}
 
 	index->ToUint32 = CAN1->sFIFOMailBox[fifo].RIR; //get index
 	*length = CAN1->sFIFOMailBox[fifo].RDTR & CAN_RDT0R_DLC;
-//don't care if it is 8 byte or 1, you should read only what needed
+	//don't care if it is 8 byte or 1, you should read only what needed
+	if (data) {
+		data[0] = CAN1->sFIFOMailBox[fifo].RDLR;
+		data[1] = CAN1->sFIFOMailBox[fifo].RDHR;
+	}
+	if (fifo == 0)
+		CAN1->RF0R = CAN_RF0R_RFOM0;
+	else
+		CAN1->RF1R = CAN_RF1R_RFOM1;
+	return status;
+}
+
+LC_Return_t CAN_ReceiveN(CAN_IR *index, uint32_t *data, uint16_t *length, int fifo) {
+	LC_Return_t status = LC_BufferEmpty;
+
+	if (fifo == 0) {
+		if ((CAN1->RF0R & CAN_RF0R_FMP0) == 0) {
+			return LC_BufferEmpty; //nothing
+		}
+	} else if (fifo == 1) {
+		if ((CAN1->RF1R & CAN_RF1R_FMP1) == 0) {
+			return LC_BufferEmpty; //nothing
+		}
+	} else {
+		return LC_BufferEmpty; //nothing
+	}
+	status = LC_Ok;
+
+	index->ToUint32 = CAN1->sFIFOMailBox[fifo].RIR; //get index
+	*length = CAN1->sFIFOMailBox[fifo].RDTR & CAN_RDT0R_DLC;
+	//don't care if it is 8 byte or 1, you should read only what needed
 	if (data) {
 		data[0] = CAN1->sFIFOMailBox[fifo].RDLR;
 		data[1] = CAN1->sFIFOMailBox[fifo].RDHR;
@@ -408,23 +520,24 @@ uint8_t _getFreeTX() {
 	return txBox;
 }
 
+uint8_t _anyTX() {
+	//invert empty bits and shit it to beginning
+	return ((~(CAN1->TSR)) & (CAN_TSR_TME0 | CAN_TSR_TME1 | CAN_TSR_TME2)) >> 26;
+}
+
 void CAN1_SCE_IRQHandler(void) {
 	CAN1->MSR |= CAN_MSR_ERRI;
-	CAN_Start();
-	//RuntimeData.Flags.CANErr = 1;
+	CAN_ERR = 1;
+	//CAN_Start();
 	//trace_printf("CAN bus RESET, error has occurred");
 }
-/*void CAN1_RX1_IRQHandler(void) {
- LC_ReceiveHandler();
-
- }*/
 
 LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *length) {
 	//Small hal overlay for converting LC header packed to CAN specific data
 	CAN_IR rindex;
 	uint16_t rlength;
 	uint8_t state = CAN_Receive(&rindex, data, &rlength);
-	if (state == CANH_Ok) {
+	if (state == LC_Ok) {
 		header->ToUint32 = rindex.EXID; //29b
 		header->Request = rindex.Request; //30b
 		*length = rlength;
@@ -434,16 +547,36 @@ LC_Return_t LC_HAL_Receive(LC_HeaderPacked_t *header, uint32_t *data, uint8_t *l
 }
 
 LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length) {
-	CAN_IR sindex;
-	sindex.EXID = header.ToUint32;
-	sindex.ExtensionID = 1;
-	sindex.Request = header.Request;
-	uint8_t state = CAN_Send(sindex, data, length);
-	return (state == CANH_Ok) ? LC_Ok : LC_BufferFull;
+	uint8_t state = 0;
+	can_packet_t packet;
+	packet.Header = header;
+	packet.data[0] = data[0];
+	packet.data[1] = data[1];
+	packet.length = length;
+#ifdef LEVCAN_USE_RTOS_QUEUE
+	uint8_t state = (xQueueSend(txCanqueue, &packet, 0) == pdTRUE) ? LC_Ok : LC_BufferFull;
+#else
+	lc_disable_irq(); //critical section
+	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE)) {
+		state = LC_BufferFull;
+	} else {
+		txFIFO[txFIFO_in] = packet;
+		txFIFO_in = (txFIFO_in + 1) % LEVCAN_TX_SIZE;
+		state = LC_Ok;
+		//uint8_t state = CAN_Send(txmsg, data, length);
+	}
+	//check for no transmission happening
+	if (_anyTX() == 0) {
+		txFifoProceed(); //critical section
+	}
+	lc_enable_irq();
+
+#endif
+	return (state == LC_Ok) ? LC_Ok : LC_BufferFull;
 }
 
 LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count) {
-	CAN_FiltersClear();
+	
 	CAN_FilterEditOn();
 
 	CAN_IR can_reg, can_mask;
@@ -457,7 +590,7 @@ LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *
 		can_reg.Request = reg[i].Request;
 		can_mask.EXID = mask[i].ToUint32;
 		can_mask.Request = mask[i].Request;
-		CAN_CreateFilterMask(can_reg, can_mask, 0);
+		CAN_CreateFilterMaskPosition(can_reg, can_mask, 0, i);
 	}
 
 	CAN_FilterEditOff();
@@ -468,13 +601,12 @@ LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *
 void CAN1_RX0_IRQHandler(void) {
 	receiveIRQ();
 }
+/*void CAN1_RX1_IRQHandler(void) {
+	receiveIRQ();
+ }*/
 void CAN1_TX_IRQHandler(void) {
-	//remove interrupts
-	LC_TransmitHandler();
-
-	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+	transmitIRQ();
 }
-
 #endif
 
 #if defined(STM32F10X_MD) || defined(STM32F30X)
@@ -482,22 +614,105 @@ void USB_LP_CAN1_RX0_IRQHandler(void) {
 	 receiveIRQ() ;
 }
 void USB_HP_CAN1_TX_IRQHandler(void) {
-	//remove interrupts
-	LC_TransmitHandler();
-	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+	transmitIRQ();
 }
 #endif
+#ifdef LEVCAN_USE_RTOS_QUEUE
+void txCanTask(void *pvParameters) {
+	(void) pvParameters;
+
+	static can_packet_t packet_from_q = { 0 };
+	for (;;) {
+		if (xQueueReceive(txCanqueue, &packet_from_q, portMAX_DELAY ) == pdTRUE) {
+			CAN_IR sindex;
+			sindex.EXID = packet_from_q.Header.ToUint32;
+			sindex.ExtensionID = 1;
+			sindex.Request = packet_from_q.Header.Request;
+			//counter
+			can_tx_cnt++;
+			//try to send till its actually sent
+			int i = 0;
+
+			while (CAN_Send(sindex, packet_from_q.data, packet_from_q.length) != LC_Ok) {
+				if (i > 3)
+					break; //cant CAN send :P
+				//cant send, wait for TX empty
+				ulTaskNotifyTake(pdTRUE, 250); // 0.25s wait
+				i++;
+			}
+		}
+	}
+}
+
+#endif
+
+LC_Return_t LC_HAL_TxHalfFull() {
+#ifdef LEVCAN_USE_RTOS_QUEUE
+	int size = uxQueueMessagesWaiting(txCanqueue);
+
+	if (size * 4 < TXQUEUE_SIZE * 3)
+		return LC_BufferEmpty;
+	else
+		return LC_BufferFull;
+#else
+	int32_t stored = 0;
+	if (txFIFO_in >= txFIFO_out)
+		stored = txFIFO_in - txFIFO_out;
+	else
+		stored = txFIFO_in + (LEVCAN_TX_SIZE - txFIFO_out);
+
+	if (stored > LEVCAN_TX_SIZE / 2)
+		return LC_BufferFull;
+	else
+		return LC_BufferEmpty;
+#endif
+
+}
+
+void transmitIRQ(void) {
+	//remove interrupts
+#ifdef LEVCAN_USE_RTOS_QUEUE
+	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+	vTaskNotifyGiveFromISR(txCantask, &xHigherPriorityTaskWoken);
+
+	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+
+	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+#else
+	txFifoProceed();
+	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+#endif
+}
 
 void receiveIRQ(void) {
 	CAN_IR rindex;
 	uint16_t rlength;
 	uint32_t data[2];
-	uint8_t state = CAN_Receive(&rindex, data, &rlength);
+	uint8_t state = CAN_ReceiveN(&rindex, data, &rlength, FIFO0);
 	//receive everything
-	for (; state == CANH_Ok; state = CAN_Receive(&rindex, data, &rlength)) {
+	for (; state == LC_Ok; state = CAN_ReceiveN(&rindex, data, &rlength, FIFO0)) {
 		LC_HeaderPacked_t header = { 0 };
 		header.ToUint32 = rindex.EXID; //29b
 		header.Request = rindex.Request; //30b
-		LC_ReceiveHandler(header, data, rlength);
+				
+		LC_ReceiveHandler(LEVCAN_Node_Drv, header, data, rlength);
 	}
 }
+
+#ifndef LEVCAN_USE_RTOS_QUEUE
+void txFifoProceed(void) {
+	while (1) {
+		if (txFIFO_in == txFIFO_out)
+			break; /* Queue Empty - nothing to send*/
+
+		CAN_IR sindex;
+		sindex.EXID = txFIFO[txFIFO_out].Header.ToUint32;
+		sindex.ExtensionID = 1;
+		sindex.Request = txFIFO[txFIFO_out].Header.Request;
+
+		if (CAN_Send(sindex, (void*)&txFIFO[txFIFO_out].data, txFIFO[txFIFO_out].length) != LC_Ok)
+			break; //CAN full
+		txFIFO_out = (txFIFO_out + 1) % LEVCAN_TX_SIZE; //successful sent
+	}
+}
+#endif
