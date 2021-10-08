@@ -56,6 +56,9 @@ enum {
 volatile uint32_t lc_collision_cntr = 0;
 volatile uint32_t lc_receive_ovfl_cntr = 0;
 #endif
+#ifdef LEVCAN_MEM_STATIC
+lc_Extensions_t lc_ExtensionsStatic[LEVCAN_MAX_OWN_NODES];
+#endif
 //#### PRIVATE FUNCTIONS ####
 LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID, int32_t size, uint8_t read_write, uint8_t nodeID);
 

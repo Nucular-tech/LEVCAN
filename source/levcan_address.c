@@ -97,7 +97,9 @@ void LC_AddressManager(LC_NodeDescriptor_t *node, uint32_t time) {
 #endif
 			}
 		} else if (node->State == LCNodeState_Online) {
+#ifdef LEVCAN_TRACE
 			static int alone = 0;
+#endif
 			//we are online! why nobody asking for it?
 			node->LastTXtime += time;
 			if (node->LastTXtime > 2500) {

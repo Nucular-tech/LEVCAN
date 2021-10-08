@@ -180,7 +180,7 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 		uint32_t globalpos = position + ((lc_Extensions_t*) node->Extensions)->fpos;
 		//finish?
 		if (toreadnow == 0)
-			return LC_Ok;
+			return LC_FR_Ok;
 		if (toreadnow > LEVCAN_FILE_DATASIZE - sizeof(fOpData_t))
 			toreadnow = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
 		if (toreadnow > INT16_MAX)
@@ -510,7 +510,7 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 						|| ((lc_Extensions_t*)node->Extensions)->frxQueue == 0
 				#endif
 			) {
-		return LC_InitError;
+		return LC_FR_IntErr;
 	}
 
 	//reset ACK
