@@ -141,7 +141,10 @@ LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 	if (node->ShortName.NodeID > 125) {
 		uint8_t hashed = hashMultiplicative((void*) &node->ShortName.ToUint32[0], 8, 0);
 		hashed = hashMultiplicative((void*) &node->Serial, sizeof(node->Serial), 0);
-		node->ShortName.NodeID = hashed % 64;
+		uint16_t id = hashed % 64;
+		if (id == 0)
+			id = 1; //skip zero for safety reasons...?
+		node->ShortName.NodeID = id;
 	}
 	if (node->NodeName != 0 && strnlen(node->NodeName, 128) == 128)
 		node->NodeName = 0;    //too long name
