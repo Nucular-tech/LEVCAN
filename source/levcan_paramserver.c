@@ -576,7 +576,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 	int type = parameter->EntryType;
 	//skip what is not need parsing
 	if (parameter->VarSize == 0 || type == LCP_Label) {
-		return LC_Ok;
+		type = LCP_End; //scroll to next line
 	}
 
 	s = skipspaces(s);
