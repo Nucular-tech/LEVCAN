@@ -202,7 +202,10 @@ void CAN_Init(uint32_t BTR) {
 	memset((void*)&txFIFO, 0, sizeof(txFIFO));
 #endif		
 }
-
+void CAN_Sleep(void) {
+	CAN1->MCR |= CAN_MCR_SLEEP;
+	NVIC_DisableIRQ(CAN1_SCE_IRQn);
+}
 /// Begin CAN operation
 void CAN_Start(void) {
 	CAN1->MSR |= CAN_MSR_ERRI; //clear errors
@@ -674,13 +677,13 @@ void transmitIRQ(void) {
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	vTaskNotifyGiveFromISR(txCantask, &xHigherPriorityTaskWoken);
-
-	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
-
+	//clears all flags
+	CAN1->TSR |= CAN_TSR_RQCP0 | CAN_TSR_RQCP1 | CAN_TSR_RQCP2;
 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 #else
 	txFifoProceed();
-	CAN1->TSR |= CAN_TSR_TXOK0 | CAN_TSR_TXOK1 | CAN_TSR_TXOK2;
+	//clears all flags
+	CAN1->TSR |= CAN_TSR_RQCP0 | CAN_TSR_RQCP1 | CAN_TSR_RQCP2;
 #endif
 }
 

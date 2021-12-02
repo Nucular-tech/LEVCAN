@@ -901,7 +901,10 @@ LC_Return_t LC_SendMessage(LC_NodeDescriptor_t *node, LC_ObjectRecord_t *object,
 		//fast send
 		uint32_t data[2];
 		memcpy(data, dataAddr, size);
-
+#ifndef LEVCAN_MEM_STATIC
+		if (object->Attributes.Cleanup)
+			lcfree(object->Address);
+#endif
 		LC_HeaderPacked_t hdr = { 0 };
 		hdr.MsgID = index;
 		hdr.Priority = ~object->Attributes.Priority;
