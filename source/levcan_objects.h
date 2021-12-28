@@ -77,6 +77,9 @@ typedef enum {
 	LC_Obj_FOCreqest,
 	LC_Obj_AhUsed,
 	LC_Obj_AhStored,
+	LC_Obj_CFactor_Internal,
+	LC_Obj_CFactorInt_Internal,
+	LC_Obj_SelectedPowerMode,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -115,7 +118,7 @@ typedef struct {
 } LC_Obj_RadSec_t;
 
 typedef struct {
-	int16_t Speed;
+	int16_t Speed; //kph
 } LC_Obj_Speed_t;
 
 typedef struct {
@@ -280,7 +283,6 @@ typedef struct {
 	float Id_request;
 } LC_Obj_FOCrequest_t;
 
-
 typedef struct {
 	int32_t mAhUsed;
 	int32_t mAhUsedFromEn;
@@ -290,3 +292,10 @@ typedef struct {
 	int32_t mAhStored;
 	int32_t mAhTotalStorage;
 } LC_Obj_AhStored_t;
+
+typedef struct {
+	uint16_t PhaseI;
+	uint16_t BatteryI;
+	uint16_t Speed; //0...100%
+	uint16_t Power; //#.#kW
+} LC_Obj_SelectedPowerMode_t;
