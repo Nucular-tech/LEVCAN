@@ -557,7 +557,7 @@ LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length
 	packet.data[1] = data[1];
 	packet.length = length;
 #ifdef LEVCAN_USE_RTOS_QUEUE
-	uint8_t state = (xQueueSend(txCanqueue, &packet, 0) == pdTRUE) ? LC_Ok : LC_BufferFull;
+	state = (xQueueSend(txCanqueue, &packet, 0) == pdTRUE) ? LC_Ok : LC_BufferFull;
 #else
 	lc_disable_irq(); //critical section
 	if (txFIFO_in == ((txFIFO_out - 1 + LEVCAN_TX_SIZE) % LEVCAN_TX_SIZE)) {
