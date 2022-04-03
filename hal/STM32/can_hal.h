@@ -98,5 +98,8 @@ LC_Return_t CAN_Receive(CAN_IR *index, uint32_t *data, uint16_t *length);
 LC_Return_t LC_HAL_Send(LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
 LC_Return_t LC_HAL_CreateFilterMasks(LC_HeaderPacked_t *reg, LC_HeaderPacked_t *mask, uint16_t count);
 LC_Return_t LC_HAL_TxHalfFull();
+#ifdef LEVCAN_USE_RTOS_QUEUE
+void txCanTask(void *);
+#endif
 extern volatile int CAN_ERR;
 extern void *LEVCAN_Node_Drv;
