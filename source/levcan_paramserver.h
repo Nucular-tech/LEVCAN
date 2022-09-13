@@ -82,6 +82,6 @@ LC_EXPORT LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node);
 LC_EXPORT void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index);
 
 LC_EXPORT const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input, int16_t *directory, int16_t *index);
-LC_EXPORT LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s, char **out);
+LC_EXPORT LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t arrayIndex, const char *s, char **out);
 LC_EXPORT int16_t LCP_IsDirectory(const LCPS_Directory_t directories[], uint16_t dirsize, const char *s);
 LC_EXPORT int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s);

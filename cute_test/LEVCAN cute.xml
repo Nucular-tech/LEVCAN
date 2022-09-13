@@ -1,0 +1,9 @@
+<testsuites>
+	<testsuite name="levcan_paramcommon" tests="2">
+		<testcase classname="levcan_paramcommon" name="lcp_print_u32b_test"/>
+		<testcase classname="levcan_paramcommon" name="lcp_print_i32f_test"/>
+	</testsuite>
+	<testsuite name="levcan_paramserver" tests="1">
+		<testcase classname="levcan_paramserver" name="levcan_paramserverTest"/>
+	</testsuite>
+</testsuites>

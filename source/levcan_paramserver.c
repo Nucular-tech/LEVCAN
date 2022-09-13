@@ -505,7 +505,7 @@ const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input,
 			int endofname = strcspn(line, endline);
 			indx = LCP_IsParameter(&((LCPS_Directory_t*) node->Directories)[dir], line);
 			//too short or large, or new line? wrong
-			if (indx > 0 && line[endofname] == '=') {
+			if (indx >= 0 && line[endofname] == '=') {
 				//endofname is here '='
 				line += endofname + 1;
 				//Pupkin #comment \n
@@ -568,7 +568,7 @@ int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s) {
 /// @param parameter
 /// @param value output
 /// @return
-LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s, char **out) {
+LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t arrayIndex, const char *s, char **out) {
 	int32_t integer = 0;
 	if (parameter == 0 || s == 0 || out == 0) {
 		return LC_DataError;
@@ -580,6 +580,11 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 	}
 
 	s = skipspaces(s);
+
+	if (parameter->Variable == 0)
+		return LC_DataError;
+
+	intptr_t *vaddress = getVAddressByIndex(parameter->Variable, parameter->VarSize, arrayIndex);
 	int length = strcspn(s, endline);
 	int varsize = parameter->VarSize;
 	LC_Return_t result = LC_Ok;
@@ -607,8 +612,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Bitfield32_t *desc = (LCP_Bitfield32_t*) parameter->Descriptor;
-		lcp_setUint32((void*) parameter->Variable, varsize, u32);
-		result = lcp_bitinRange((void*) parameter->Variable, varsize, desc->Mask);
+		lcp_setUint32(vaddress, varsize, u32);
+		result = lcp_bitinRange(vaddress, varsize, desc->Mask);
 	}
 		break;
 	case LCP_Uint32: {
@@ -628,8 +633,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Uint32_t *desc = (LCP_Uint32_t*) parameter->Descriptor;
-		lcp_setUint32((void*) parameter->Variable, varsize, u32);
-		result = lcp_u32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		lcp_setUint32(vaddress, varsize, u32);
+		result = lcp_u32inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;
 	case LCP_Int32: {
@@ -644,8 +649,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Int32_t *desc = (LCP_Int32_t*) parameter->Descriptor;
-		lcp_setInt32((void*) parameter->Variable, varsize, i32);
-		result = lcp_i32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		lcp_setInt32(vaddress, varsize, i32);
+		result = lcp_i32inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;
 #ifdef LEVCAN_USE_INT64
@@ -661,8 +666,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Uint64_t *desc = (LCP_Uint64_t*) parameter->Descriptor;
-		*((uint64_t*) parameter->Variable) = u64;
-		result = lcp_u64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		*((uint64_t*) vaddress) = u64;
+		result = lcp_u64inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;
 	case LCP_Int64: {
@@ -677,8 +682,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Int64_t *desc = (LCP_Int64_t*) parameter->Descriptor;
-		*((int64_t*) parameter->Variable) = i64;
-		result = lcp_i64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		*((int64_t*) vaddress) = i64;
+		result = lcp_i64inRange(vaddress, varsize, desc->Min, desc->Max);
 
 	}
 		break;
@@ -697,8 +702,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 
 		LCP_Decimal32_t *ddesc = (LCP_Decimal32_t*) parameter->Descriptor;
 		integer = temp * lcp_pow10i(ddesc->Decimals);
-		lcp_setInt32((void*) parameter->Variable, varsize, integer);
-		result = lcp_i32inRange((void*) parameter->Variable, varsize, ddesc->Min, ddesc->Max);
+		lcp_setInt32(vaddress, varsize, integer);
+		result = lcp_i32inRange(vaddress, varsize, ddesc->Min, ddesc->Max);
 
 #endif
 	}
@@ -739,14 +744,14 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 			}
 		}
 		if (found) {
-			lcp_setUint32((void*) parameter->Variable, varsize, integer);
+			lcp_setUint32(vaddress, varsize, integer);
 			if (type == LCP_Bool) {
-				result = lcp_u32inRange((void*) parameter->Variable, varsize, 0, 1);
+				result = lcp_u32inRange(vaddress, varsize, 0, 1);
 			} else {
 				LCP_Enum_t *desc = (LCP_Enum_t*) parameter->Descriptor;
 				//todo min-size logic?
 				uint32_t max = desc->Size > 0 ? desc->Min + desc->Size - 1 : desc->Min;
-				result = lcp_u32inRange((void*) parameter->Variable, varsize, desc->Min, max);
+				result = lcp_u32inRange(vaddress, varsize, desc->Min, max);
 			}
 		}
 	}
@@ -765,8 +770,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Float_t *desc = (LCP_Float_t*) parameter->Descriptor;
-		*((float*) parameter->Variable) = f32;
-		result = lcp_f32inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		*((float*) vaddress) = f32;
+		result = lcp_f32inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;
 #endif
@@ -783,8 +788,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 		}
 
 		LCP_Double_t *desc = (LCP_Double_t*) parameter->Descriptor;
-		*((double*) parameter->Variable) = d64;
-		result = lcp_d64inRange((void*) parameter->Variable, varsize, desc->Min, desc->Max);
+		*((double*) vaddress) = d64;
+		result = lcp_d64inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;
 #endif
@@ -793,7 +798,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const char *s
 	}
 
 	*out = (char*) s + strcspn(s, newline); //scroll to new line
-	*out = skipspaces(*out);
+	*out = (char*) skipspaces(*out);
 	return result;
 }
 
