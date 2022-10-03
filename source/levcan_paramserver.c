@@ -271,7 +271,7 @@ void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayInde
 }
 
 static int checkExists(const LCPS_Directory_t directories[], uint16_t dirsize, uint16_t directory, int32_t entry_index) {
-	if (directories == 0 || directory >= dirsize || directories[directory].Entries == 0 || entry_index >= directories[directory].Size)
+	if (directories == 0 || directory >= dirsize || entry_index >= directories[directory].Size)
 		return 0;
 	return 1;
 }
