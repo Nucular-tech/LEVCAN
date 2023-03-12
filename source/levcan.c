@@ -80,6 +80,8 @@ extern LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t *node, uint16_t t
 
 LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 	static int init = 0;
+	if (node == 0)
+		return LC_ObjectError;
 	//clean up
 	//memset(node->SystemObjects, 0, sizeof(node->SystemObjects));
 	memset(node, 0, sizeof(LC_NodeDescriptor_t));
@@ -137,7 +139,7 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 
 LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 	if (node == 0 || node->Driver == 0)
-		return LC_DataError;
+		return LC_InitError;
 	if (node->ShortName.NodeID > 125) {
 		uint8_t hashed = hashMultiplicative((void*) &node->ShortName.ToUint32[0], 8, 0);
 		hashed = hashMultiplicative((void*) &node->Serial, sizeof(node->Serial), 0);
@@ -481,6 +483,10 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 	int32_t length;
 	uint32_t data[2];
 	uint32_t step_inc = 8;
+
+	if (object == 0 || node == 0)
+		return LC_ObjectError;
+
 	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
 	//requests and timeout only TCP
 	if (object->Flags.TCP == 1 && (request || timeout)) {
@@ -578,12 +584,15 @@ uint16_t objectTXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, LC_H
 		object->Pointer = 0;
 		object->Flags.ToDelete = 1;
 	}
-	return 0;
+	return LC_Ok;
 }
 
 uint16_t objectRXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, lc_msgBuffered *msg) {
+	if (object == 0 || node == 0)
+		return LC_ObjectError;
+
 	if ((msg != 0) && (msg->header.RTS_CTS && object->Position != 0))
-		return 1; //position 0 can be started only with RTS (RTS will create new transfer object)
+		return LC_DataError; //position 0 can be started only with RTS (RTS will create new transfer object)
 	uint32_t step_inc = (8);
 	uint8_t parity = ~((object->Position + step_inc - 1) / step_inc) & 1;    //parity
 	int32_t position_new = object->Position;
@@ -666,10 +675,13 @@ uint16_t objectRXproceed(LC_NodeDescriptor_t *node, lc_objBuffered *object, lc_m
 		//deleteObject(node, object, (objBuffered**) &objRXbuf_start, (objBuffered**) &objRXbuf_end);
 	}
 
-	return 0;
+	return LC_Ok;
 }
 
 LC_Return_t objectRXfinish(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, char *data, int32_t size, uint8_t memfree) {
+	if (node == 0)
+		return LC_ObjectError;
+
 	LC_Return_t ret = LC_Ok;
 	//check check and check again
 	LC_ObjectRecord_t obj = findObjectRecord(node, header.MsgID, size, Write, header.Source);
@@ -690,7 +702,7 @@ LC_Return_t objectRXfinish(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, 
 #ifdef LEVCAN_USE_RTOS_QUEUE
 		} else if (obj.Attributes.Queue) {
 
-			if (memfree == 0) {
+			if (memfree == 0 && data != 0) {
 				//that means it uses static memory.
 				char *allocated_mem = lcmalloc(size);
 				if (allocated_mem) {
@@ -716,7 +728,8 @@ LC_Return_t objectRXfinish(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, 
 			if (sizeabs > size)
 				sizeabs = size;
 
-			memcpy(obj.Address, data, sizeabs);
+			if (data != 0)
+				memcpy(obj.Address, data, sizeabs);
 		}
 	} else {
 		ret = LC_ObjectError;
@@ -726,7 +739,7 @@ LC_Return_t objectRXfinish(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, 
 	}
 	//cleanup
 #ifndef LEVCAN_MEM_STATIC
-	if (memfree) {
+	if (memfree && data != 0) {
 		lcfree(data);
 	}
 #endif
@@ -789,7 +802,7 @@ LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID
 						//Group C
 								((record[irec].NodeID == LC_Broadcast_Address) || 			//any match == broadcast
 						(record[irec].NodeID == nodeID))) 							//specific node ID match
-											//@formatter:on
+																															//@formatter:on
 					{
 						return record[irec];    //yes
 
@@ -981,8 +994,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 				}
 			} else {
 				//find existing TX object, tcp clear-to-send and end-of-msg-ack
-				lc_objBuffered *TXobj = findObject((void*) node->TxRxObjects.objTXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Source,
-						rxBuffered.header.Target);
+				lc_objBuffered *TXobj = findObject((void*) node->TxRxObjects.objTXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Source, rxBuffered.header.Target);
 				if (TXobj) {
 					objectTXproceed(node, TXobj, &rxBuffered.header, LC_Ok);
 				} else {
@@ -1062,8 +1074,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 				}
 			} else {
 				//find existing RX object
-				lc_objBuffered *RXobj = findObject((void*) node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target,
-						rxBuffered.header.Source);
+				lc_objBuffered *RXobj = findObject((void*) node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target, rxBuffered.header.Source);
 				if (RXobj)
 					objectRXproceed(node, RXobj, &rxBuffered);
 			}

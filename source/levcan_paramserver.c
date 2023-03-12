@@ -580,6 +580,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 	}
 
 	s = skipspaces(s);
+	*out = (char*)s;
 
 	if (parameter->Variable == 0)
 		return LC_DataError;
@@ -803,7 +804,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 }
 
 const char* skipspaces(const char *s) {
-	for (; isspace(*s); s++)
+	for (; isspace((uint8_t)*s); s++)
 		;
 	return s;
 }
