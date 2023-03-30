@@ -1,3 +1,6 @@
+//  SPDX-FileCopyrightText: 2023 Nucular Limited
+//  SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include "levcan_filedef.h"
