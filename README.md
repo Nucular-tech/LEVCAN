@@ -8,7 +8,7 @@ Uses 29bit CAN network (1MBps default), check dev branches for latest builds.
 Features
 ----------------
  - Two transmission modes, "TCP" (controlled reception and data order) and "UDP"
- - Multiple nodes supported for one device (not really yet)
+ - Notifications for user
  - Dynamic network address
  - Configurable parameters for devices
  - Simple file i/o with file server

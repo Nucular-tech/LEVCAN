@@ -157,8 +157,8 @@ typedef union {
 	struct {
 		unsigned int Enable :1;
 		unsigned int Lock :1;
-		unsigned int Throttle :1;
-		unsigned int Brake :1;
+		unsigned int ThrottleFail :1;
+		unsigned int BrakeFail :1;
 		unsigned int Speed :3;
 		unsigned int Reverse :1;
 		unsigned int Cruise :1;
@@ -179,9 +179,12 @@ typedef union {
 		unsigned int BatteryFail :1;
 		unsigned int EBrakeLimited :1;
 		unsigned int EABS :1;
+		unsigned int EASR :1;
+		unsigned int ESP :1;
+		unsigned int CruiseReady :1;
 		unsigned int Service :1;
 		unsigned int FanActive :1;
-		unsigned int HeaterActive :1;
+		unsigned int BatteryHeater :1;
 	} LEVCAN_PACKED;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
