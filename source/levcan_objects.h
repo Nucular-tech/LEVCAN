@@ -157,8 +157,8 @@ typedef union {
 	struct {
 		unsigned int Enable :1;
 		unsigned int Lock :1;
-		unsigned int ThrottleFail :1;
-		unsigned int BrakeFail :1;
+		unsigned int ThrottleSignal :1;
+		unsigned int BrakeSignal :1;
 		unsigned int Speed :3;
 		unsigned int Reverse :1;
 		unsigned int Cruise :1;
