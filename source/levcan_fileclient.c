@@ -255,15 +255,16 @@ void processReceivedData(volatile fRead_t *rxtoread, fOpData_t *opdata, int32_t 
 /// @return LC_FileResult_t
 LC_FileResult_t LC_FileWrite(LC_NodeDescriptor_t *node, const char *buffer, uint32_t btw, uint32_t *bw) {
 	LC_FileResult_t ret = LC_FR_Ok;
-	uint16_t attempt;
-	char writedata[btw + sizeof(fOpData_t)];
-
 	if (bw == 0 || buffer == 0)
 		return LC_FR_InvalidParameter;
+
+	uint32_t bufsize = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
+	if (btw < bufsize)
+		bufsize = btw;
+	//careful with memory allocation
+	char writedata[bufsize + sizeof(fOpData_t)];
 	//reset
 	*bw = 0;
-	attempt = 0;
-
 	fOpData_t *writef = (fOpData_t*) &writedata;
 	writef->Operation = fOpData;
 
@@ -286,18 +287,12 @@ LC_FileResult_t LC_FileWrite(LC_NodeDescriptor_t *node, const char *buffer, uint
 			//rxtoread->Position is bytes written
 			position += ask_result.Position;
 			*bw += ask_result.Position;
-			attempt = 0;
 			if (ask_result.Position < towritenow)
 				break; //not all written
-		} else {
-			attempt++;
-			if (attempt > 3) {
-				ret = LC_FR_NetworkTimeout;
-				break;
-			}
 		}
+
 		//got some errs?
-		if (ret != LC_FR_NetworkError) {
+		if (ret != LC_FR_Ok) {
 			break;
 		}
 	}
@@ -487,9 +482,9 @@ LC_FileResult_t lc_client_sendwait(LC_NodeDescriptor_t *node, void *data, uint16
 
 	if (node == 0 || node->Extensions == 0
 #ifdef LEVCAN_USE_RTOS_QUEUE
-						|| ((lc_Extensions_t*)node->Extensions)->frxQueue == 0
-				#endif
-			) {
+			|| ((lc_Extensions_t*) node->Extensions)->frxQueue == 0
+#endif
+					) {
 		return LC_FR_IntErr;
 	}
 
