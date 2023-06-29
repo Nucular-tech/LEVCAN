@@ -161,8 +161,13 @@ LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t bt
 		//finish?
 		if (toreadnow == 0)
 			return LC_FR_Ok;
+#ifndef LEVCAN_MEM_STATIC
 		if (toreadnow > LEVCAN_FILE_DATASIZE - sizeof(fOpData_t))
 			toreadnow = LEVCAN_FILE_DATASIZE - sizeof(fOpData_t);
+#else
+		if (toreadnow > LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t))
+			toreadnow = LEVCAN_OBJECT_DATASIZE - sizeof(fOpData_t);
+#endif
 		if (toreadnow > INT16_MAX)
 			toreadnow = INT16_MAX;
 		//Prepare receiver
