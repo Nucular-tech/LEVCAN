@@ -94,20 +94,27 @@ typedef struct {
 
 typedef struct {
 	uint16_t Flags; //LCP_StringFlags
+	uint16_t MinLength;
+	uint16_t MaxLength;
+	uint16_t Reserved;
 } LCP_String_t;
 
 typedef enum {
 	StringFlags_None = 0, // just text
 	StringFlags_Numeric = 1 << 0, // numbers only
-	StringFlags_Letters = 1 << 1, // letters only
-	StringFlags_SpecChar = 1 << 2, // special character, e.g., ! @ # ?
-	StringFlags_Password = 1 << 3, // show only ***
-	StringFlags_Email = 1 << 4, // one@two.com
-	StringFlags_Phone = 1 << 5, // +1(234)567 89 89
-	StringFlags_Website = 1 << 6, // www.dot.com
-	StringFlags_Multiline = 1 << 7, // allow /r/n
-	StringFlags_UTF8 = 1 << 8, // force UTF8 encoding (char)
-	StringFlags_UTF16 = 1 << 9, // force UTF16 encoding (wchar)
+	StringFlags_Hexadecimal = 1 << 1, // Hex numbers
+	StringFlags_Letters = 1 << 2, // letters only
+	StringFlags_NoBlank = 1 << 3, // no blank letters
+	StringFlags_SpecChar = 1 << 4, // special character, e.g., ! @ # ?
+	StringFlags_Password = 1 << 5, // show ***
+	StringFlags_Email = 1 << 6, // one@two.com
+	StringFlags_Phone = 1 << 7, // +1(234)567 89 89
+	StringFlags_Website = 1 << 8, // www.dot.com
+	StringFlags_Multiline = 1 << 9, // allow /r/n
+	StringFlags_Uppercase = 1 << 10, // UPPERCASE
+	StringFlags_UTF8 = 1 << 14, // force UTF8 encoding (char)
+	StringFlags_UTF16 = 1 << 15, // force UTF16 encoding (wchar)
+	StringFlags_ASCII = StringFlags_UTF8 | StringFlags_UTF16 // force ASCII encoding (char)
 } LCP_StringFlags;
 
 LC_EXPORT LC_Return_t LCP_LimitValue(intptr_t *variable, uint16_t varSize, const intptr_t *descriptor, uint16_t descSize, uint8_t type);
