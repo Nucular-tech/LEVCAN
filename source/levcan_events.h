@@ -54,6 +54,7 @@ typedef struct {
 
 LC_EXPORT LC_Return_t LC_EventInit(LC_NodeDescriptor_t *node);
 LC_EXPORT LC_EventResult_t LC_EventSend(LC_NodeDescriptor_t* node, const char* text, const char* caption, LC_EventButtons_t buttons, uint8_t receiver);
+LC_EXPORT LC_EventResult_t LC_EventSendF(LC_NodeDescriptor_t *node, LC_EventButtons_t buttons, uint8_t receiver, const char *caption, const char *text, ...);
 LC_EXPORT LC_NodeShortName_t LC_FindEventServer(LC_NodeDescriptor_t* node, uint16_t *scnt) ;
 LC_EXPORT void LC_EventReset(LC_NodeDescriptor_t* node, uint8_t receiver);
 LC_EXPORT int LC_EventReceive(const void* data, int32_t dsize, uint8_t sender, LC_Event_t* event);

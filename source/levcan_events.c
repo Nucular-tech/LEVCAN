@@ -22,6 +22,8 @@ typedef struct {
 volatile uint8_t lc_eventButtonPressed = LC_EB_None;
 char lc_event_buffer[LC_EVENT_SIZE];
 
+LC_Return_t lc_sendEventMsg(LC_NodeDescriptor_t *node, uint16_t buffersize, uint8_t receiver);
+
 LC_Return_t LC_EventInit(LC_NodeDescriptor_t *node) {
 	//Event response
 	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
@@ -40,28 +42,67 @@ LC_EventResult_t LC_EventSend(LC_NodeDescriptor_t *node, const char *text, const
 	if (text == 0 || receiver > LC_Broadcast_Address)
 		return LC_ER_None;
 
-	uint32_t texts = strlen(text) + 1;
+	eventSend_t *evnt = (eventSend_t*) lc_event_buffer;
+	size_t maxtxtsize = sizeof(lc_event_buffer) - sizeof(eventSend_t);
+
+	uint32_t texts = strnlen(text, maxtxtsize) + 1;
 	uint32_t caps = 0;
 	if (caption)
-		caps = strlen(caption) + 1;
-	if (texts > INT16_MAX)
-		texts = INT16_MAX;
-	if (caps > UINT8_MAX)
-		caps = UINT8_MAX;
-	//find any event receiver
-	if (receiver >= LC_Null_Address)
-		receiver = LC_FindEventServer(node, 0).NodeID;
+		caps = strnlen(caption, maxtxtsize) + 1;
 
 	uint16_t buffersize = texts + caps + sizeof(eventSend_t);
 	if (buffersize > LC_EVENT_SIZE)
 		return LC_ER_None;
 
-	eventSend_t *evnt = (eventSend_t*) lc_event_buffer;
 	evnt->Buttons_Icons = buttons;
 	evnt->CaptionSize = caps; //including zero
 	evnt->TextSize = texts;
 	memcpy(evnt->Text, text, texts);
 	memcpy(&evnt->Text[texts], caption, caps);
+
+	lc_sendEventMsg(node, buffersize, receiver);
+
+	return lc_eventButtonPressed;
+}
+
+LC_EventResult_t LC_EventSendF(LC_NodeDescriptor_t *node, LC_EventButtons_t buttons, uint8_t receiver, const char *caption, const char *text, ...) {
+	if (text == 0 || receiver > LC_Broadcast_Address)
+		return LC_ER_None;
+
+	eventSend_t *evnt = (eventSend_t*) lc_event_buffer;
+	size_t maxtxtsize = sizeof(lc_event_buffer) - sizeof(eventSend_t);
+
+	va_list ap;
+	va_start(ap, text);
+	evnt->Text[0] = 0;
+	int32_t texts = vsnprintf(evnt->Text, maxtxtsize - 1, text, ap) + 1;
+	va_end(ap);
+
+	if (texts < 0) {
+		texts = 0;
+	}
+	uint32_t caps = 0;
+	if (caption)
+		caps = strnlen(caption, maxtxtsize) + 1;
+
+	uint16_t buffersize = texts + caps + sizeof(eventSend_t);
+	if (buffersize > LC_EVENT_SIZE)
+		return LC_ER_None;
+
+	evnt->Buttons_Icons = buttons;
+	evnt->CaptionSize = caps; //including zero
+	evnt->TextSize = texts;
+	//copy only caption text
+	memcpy(&evnt->Text[texts], caption, caps);
+
+	lc_sendEventMsg(node, buffersize, receiver);
+	return lc_eventButtonPressed;
+}
+
+LC_Return_t lc_sendEventMsg(LC_NodeDescriptor_t *node, uint16_t buffersize, uint8_t receiver) {
+	//find any event receiver
+	if (receiver >= LC_Null_Address)
+		receiver = LC_FindEventServer(node, 0).NodeID;
 
 	LC_ObjectRecord_t rec = { 0 };
 	rec.Address = lc_event_buffer;
@@ -69,12 +110,11 @@ LC_EventResult_t LC_EventSend(LC_NodeDescriptor_t *node, const char *text, const
 	rec.Attributes.TCP = 1;
 	rec.Attributes.Priority = LC_Priority_Low;
 	rec.NodeID = receiver;
-	LC_SendMessage(node, &rec, LC_SYS_Events);
 
-	return lc_eventButtonPressed;
+	return LC_SendMessage(node, &rec, LC_SYS_Events);
 }
 
-void LC_EventReset(LC_NodeDescriptor_t* node, uint8_t receiver) {
+void LC_EventReset(LC_NodeDescriptor_t *node, uint8_t receiver) {
 	if (receiver != LC_Null_Address) {
 		if (receiver >= LC_Null_Address)
 			receiver = LC_FindEventServer(node, 0).NodeID;

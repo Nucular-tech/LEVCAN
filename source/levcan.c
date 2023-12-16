@@ -68,6 +68,7 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 	node->State = LCNodeState_Disabled;
 	node->ShortName.CodePage = 1250; //Central European
 	node->ShortName.NodeID = LC_Broadcast_Address;
+	node->ShortName.DynamicID = 1;
 	node->LastID = LC_Broadcast_Address;
 
 #ifndef LEVCAN_MEM_STATIC
@@ -120,20 +121,23 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 	if (node == 0 || node->Driver == 0)
 		return LC_InitError;
-	if (node->ShortName.NodeID > 125) {
-		uint8_t hashed = hashMultiplicative((void*) &node->ShortName.ToUint32[0], 8, 0);
-		hashed = hashMultiplicative((void*) &node->Serial, sizeof(node->Serial), 0);
-		uint16_t id = hashed % 64;
-		if (id == 0)
-			id = 1; //skip zero for safety reasons...?
-		node->ShortName.NodeID = id;
-	}
 	if (node->NodeName != 0 && strnlen(node->NodeName, 128) == 128)
 		node->NodeName = 0;    //too long name
 	if (node->DeviceName != 0 && strnlen(node->DeviceName, 128) == 128)
 		node->DeviceName = 0;
 	if (node->VendorName != 0 && strnlen(node->VendorName, 128) == 128)
 		node->VendorName = 0;
+
+	uint8_t hashedSN = hashMultiplicative((void*) &node->Serial, sizeof(node->Serial), 0);
+	if (node->ShortName.NodeID > 125) {
+		uint16_t id = hashedSN % 64;
+		if (id == 0)
+			id = 1; //skip zero for safety reasons...?
+		node->ShortName.NodeID = id;
+	}
+	if (node->ShortName.SerialNumber == 0) {
+		node->ShortName.SerialNumber = hashedSN & 0xFFF;
+	}
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	node->TxRxObjects.rxQueue = LC_QueueCreate(LEVCAN_RX_SIZE, sizeof(lc_msgBuffered));
@@ -782,7 +786,7 @@ LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID
 						//Group C
 								((record[irec].NodeID == LC_Broadcast_Address) || 			//any match == broadcast
 						(record[irec].NodeID == nodeID))) 							//specific node ID match
-																															//@formatter:on
+																																																			//@formatter:on
 					{
 						return record[irec];    //yes
 

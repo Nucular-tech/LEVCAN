@@ -42,9 +42,9 @@ typedef struct {
 } LC_ObjectRecord_t;
 
 typedef struct {
-	uint8_t Source;
-	uint8_t Target;
-	uint16_t MsgID;
+	uint8_t Source; //7 bits
+	uint8_t Target; //7 bits
+	uint16_t MsgID; //10 bits
 	union {
 		uint16_t ControlBits;
 		struct {
@@ -61,15 +61,15 @@ typedef union {
 	uint32_t ToUint32;
 	struct {
 		//index 29bit:
-		uint32_t Source : 7;
-		uint32_t Target : 7;
-		uint32_t MsgID : 10;
-		uint32_t EoM : 1;
-		uint32_t Parity : 1;
-		uint32_t RTS_CTS : 1;
-		uint32_t Priority : 2;
+		uint32_t Source : 7; //From
+		uint32_t Target : 7; //To
+		uint32_t MsgID : 10; //Up to 1024 messages
+		uint32_t EoM : 1; //End Of Message
+		uint32_t Parity : 1; //Message parity
+		uint32_t RTS_CTS : 1; //Ready to send / Clear to send
+		uint32_t Priority : 2; //CAN bus priority bits
 		//RTR bit:
-		uint32_t Request : 1;
+		uint32_t Request : 1; //Request message
 	} ;
 } LC_HeaderPacked_t;
 
@@ -83,18 +83,18 @@ typedef struct {
 	union {
 		uint32_t ToUint32[2];
 		struct {
-			uint32_t Configurable : 1; 	//0
-			uint32_t Variables : 1; 		//1
-			uint32_t SWUpdates : 1; 		//2
-			uint32_t Events : 1; 		//3
-			uint32_t FileServer : 1;		//4
+			uint32_t Configurable : 1; 	//0 Have configurable parameters
+			uint32_t Variables : 1; 	//1
+			uint32_t SWUpdates : 1; 	//2 Have software update feature
+			uint32_t Events : 1; 		//3 Have LEVCAN events
+			uint32_t FileServer : 1;	//4 Have file server running
 			uint32_t CodePage : 16;		//5-20 https://docs.microsoft.com/en-us/dotnet/api/system.text.encoding?view=netcore-3.1
 			uint32_t reserved1 : (32 - 5 - 16 - 1);		//21-30
-			uint32_t DynamicID : 1;		//31
+			uint32_t DynamicID : 1;		//31 1-Yes, 0-No, MSB bit, defines priority on CAN bus
 			//32b align
-			uint32_t DeviceType : 10;	//32-41
-			uint32_t ManufacturerCode : 10;	//42-51
-			uint32_t SerialNumber : 12;	//52-63
+			uint32_t DeviceType : 10;	//32-41 LC_Device_t
+			uint32_t ManufacturerCode : 10;	//42-51 Custom field
+			uint32_t SerialNumber : 12;	//52-63 Short SN
 		};
 	};
 	uint16_t NodeID;

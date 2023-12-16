@@ -197,7 +197,7 @@ void lc_addressClaimHandler(LC_NodeDescriptor_t *node, LC_NodeShortName_t claim,
 					node->State = LCNodeState_WaitingClaim;
 					LC_ConfigureFilters(node);
 #ifdef LEVCAN_TRACE
-						trace_printf("We lost ID:%d\n", claim.NodeID);
+						trace_printf("Lost ID:%d\n", claim.NodeID);
 #endif
 				} else {
 					//send own data to break other nodeName id

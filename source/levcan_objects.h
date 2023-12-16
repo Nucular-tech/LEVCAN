@@ -160,31 +160,31 @@ typedef union {
 		unsigned int ThrottleSignal :1;
 		unsigned int BrakeSignal :1;
 		unsigned int Speed :3;
-		unsigned int Reverse :1;
-		unsigned int Cruise :1;
-		unsigned int TurnRight :1;
-		unsigned int TurnLeft :1;
-		unsigned int LowBeam :1;
-		unsigned int HighBeam :1;
-		unsigned int PedalAssist :1;
-		unsigned int ConverterMode :1;
-		unsigned int WheelDriveLock :1;
-		unsigned int BatteryUnlocked :1;
-		unsigned int MotorWarning :1;
-		unsigned int MotorFail :1;
-		unsigned int ControllerWarning :1;
-		unsigned int ControllerFail :1;
-		unsigned int LowBattery :1;
-		unsigned int BatteryWarning :1;
-		unsigned int BatteryFail :1;
-		unsigned int EBrakeLimited :1;
-		unsigned int EABS :1;
-		unsigned int EASR :1;
-		unsigned int ESP :1;
-		unsigned int CruiseReady :1;
-		unsigned int Service :1;
-		unsigned int FanActive :1;
-		unsigned int BatteryHeater :1;
+		unsigned int Reverse :1; //7
+		unsigned int Cruise :1; //8
+		unsigned int TurnRight :1; //9
+		unsigned int TurnLeft :1; //10
+		unsigned int LowBeam :1; //11
+		unsigned int HighBeam :1; //12
+		unsigned int PedalAssist :1; //13
+		unsigned int ConverterMode :1; //14
+		unsigned int WheelDriveLock :1; //15
+		unsigned int BatteryUnlocked :1; //16
+		unsigned int MotorWarning :1; //17
+		unsigned int MotorFail :1; //18
+		unsigned int ControllerWarning :1; //19
+		unsigned int ControllerFail :1; //20
+		unsigned int LowBattery :1; //21
+		unsigned int BatteryWarning :1; //22
+		unsigned int BatteryFail :1; //23
+		unsigned int EBrakeLimited :1; //24
+		unsigned int EABS :1; //25 Electronic Anti Block System
+		unsigned int EASR :1; //26 Electronic Anti Slip Regulation
+		unsigned int ESP :1; //27 Electronic Stability Program
+		unsigned int CruiseReady :1; //28
+		unsigned int Service :1; //29
+		unsigned int FanActive :1; //30
+		unsigned int BatteryHeater :1; //31
 	} LEVCAN_PACKED;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
