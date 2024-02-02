@@ -65,3 +65,4 @@ LC_EXPORT const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const ch
 LC_EXPORT LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t arrayIndex, const char *s, char **out);
 LC_EXPORT int16_t LCP_IsDirectory(const LCPS_Directory_t directories[], uint16_t dirsize, const char *s);
 LC_EXPORT int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s);
+LC_EXPORT uint8_t LCP_GetLastAccessNodeID(LC_NodeDescriptor_t *node);

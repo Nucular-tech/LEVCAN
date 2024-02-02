@@ -10,6 +10,9 @@ typedef struct {
 	void *paramClientQueue;
 	LC_ObjectRecord_t paramClientRecord;
 #endif
+#ifdef LEVCAN_PARAMETERS_SERVER
+	uint8_t paramServerLastAccessNodeId;
+#endif
 #ifdef LEVCAN_FILECLIENT
 	uint8_t fnode;
 	uint32_t fpos;

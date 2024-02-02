@@ -230,8 +230,7 @@ typedef struct {
 } LC_Obj_CellMinMax_t;
 
 typedef struct {
-	uint16_t Normalized; //0-1024
-	uint16_t SensorVoltage; //mV
+	uint16_t Luminance; //cd/m2
 } LC_Obj_LightSensor_t;
 
 typedef struct {

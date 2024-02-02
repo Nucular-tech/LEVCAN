@@ -10,6 +10,11 @@
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
 #include "levcan_paramcommon.h"
+#include "levcan_internal.h"
+
+#ifndef LEVCAN_PARAMETERS_SERVER
+#error "Define LEVCAN_PARAMETERS_SERVER in \"levcan_config.h\"!"
+#endif
 
 //Private functions
 void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
@@ -20,6 +25,8 @@ void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayInde
 const char* skipspaces(const char *s);
 
 LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
+	if (node == 0 || node->Extensions == 0)
+		return LC_InitError;
 	//register function call to this object
 	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
 	if (initObject == 0) {
@@ -31,6 +38,7 @@ LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
 	initObject->Attributes.TCP = 1;
 	initObject->MsgID = LC_SYS_ParametersRequest;
 	initObject->Size = -LEVCAN_FILE_DATASIZE; //up to size
+	((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId = LC_Broadcast_Address;
 	node->ShortName.Configurable = 1;
 	return LC_Ok;
 }
@@ -561,7 +569,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 	}
 
 	s = skipspaces(s);
-	*out = (char*)s;
+	*out = (char*) s;
 
 	if (parameter->Variable == 0)
 		return LC_DataError;
@@ -784,8 +792,14 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 	return result;
 }
 
+uint8_t LCP_GetLastAccessNodeID(LC_NodeDescriptor_t *node) {
+	if (node != 0 && node->Extensions != 0)
+		return ((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId;
+	return LC_Broadcast_Address;
+}
+
 const char* skipspaces(const char *s) {
-	for (; isspace((uint8_t)*s); s++)
+	for (; isspace((uint8_t )*s); s++)
 		;
 	return s;
 }

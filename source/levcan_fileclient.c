@@ -34,9 +34,13 @@ uint32_t lc_printf_size = 0;
 LC_Return_t LC_FileClientInit(LC_NodeDescriptor_t *node) {
 #ifdef LEVCAN_FILECLIENT
 	//File client
-	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
-	if (node == 0 || node->Extensions == 0 || initObject == 0)
+	if (node == 0 || node->Extensions == 0)
 		return LC_InitError;
+	//register function call to this object
+	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
+	if (initObject == 0) {
+		return LC_MallocFail;
+	}
 #ifdef LEVCAN_USE_RTOS_QUEUE
 
 	initObject->Address = LC_QueueCreate(LEVCAN_MAX_OWN_NODES, sizeof(LC_ObjectData_t));

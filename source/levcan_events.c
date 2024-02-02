@@ -25,11 +25,13 @@ char lc_event_buffer[LC_EVENT_SIZE];
 LC_Return_t lc_sendEventMsg(LC_NodeDescriptor_t *node, uint16_t buffersize, uint8_t receiver);
 
 LC_Return_t LC_EventInit(LC_NodeDescriptor_t *node) {
-	//Event response
-	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
-	if (node == 0 || node->Extensions == 0 || initObject == 0)
+	if (node == 0 || node->Extensions == 0)
 		return LC_InitError;
-
+	//event response
+	LC_Object_t *initObject = lc_registerSystemObjects(node, 1);
+	if (initObject == 0) {
+		return LC_MallocFail;
+	}
 	initObject->Address = (void*) &lc_eventButtonPressed;
 	initObject->Attributes.Writable = 1;
 	initObject->MsgID = LC_SYS_Events;
