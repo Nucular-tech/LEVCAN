@@ -60,6 +60,9 @@ typedef enum {
 	LC_Obj_CFactor_Internal,
 	LC_Obj_CFactorInt_Internal,
 	LC_Obj_SelectedPowerMode,
+	LC_Obj_PowerModeIndex,
+	LC_Obj_BatteryCurrents,
+	LC_Obj_BatteryVoltages,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -276,8 +279,20 @@ typedef struct {
 } LC_Obj_AhStored_t;
 
 typedef struct {
-	uint16_t PhaseI;
-	uint16_t BatteryI;
-	uint16_t Speed; //0...100%
+	uint16_t PhaseI; //A
+	uint16_t BatteryI; //A
 	uint16_t Power; //#.#kW
-} LC_Obj_SelectedPowerMode_t;
+	uint8_t Speed; //0...100%...200%
+	int8_t Index; //Mode index number
+} LC_Obj_PowerMode_t;
+
+typedef struct {
+	uint32_t ChargeI; //mA
+	uint32_t DischargeI; //mA
+} LC_Obj_BatteryCurrents_t;
+
+typedef struct {
+	uint32_t MinV; //mV
+	uint32_t MaxV; //mV
+} LC_Obj_BatteryVoltages_t;
+
