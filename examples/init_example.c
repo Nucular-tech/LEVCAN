@@ -8,7 +8,7 @@
 #include "levcan.h"
 #include "can_hal.h"
 // include device configuration
-#include "levcan_param.h"
+#include "levcan_paramserver.h"
 // include standard levcan objects
 #include "levcan_objects.h"
 
@@ -20,7 +20,7 @@ struct {
 
 struct {
 	uint32_t Parameter1;
-	float Parameter2;
+	uint32_t Parameter2;
 	struct {
 		enum {
 			ThrottleOff, ThrottleActive, ThrottlePassive
@@ -52,34 +52,32 @@ const uint16_t node_obj_size = sizeof(node_obj) / sizeof(node_obj[0]);
 // Parameters used to configure your device through display.
 // Describe variables, set limits, name and formatting
 // declare variables to use them before their body
-extern const LC_ParameterAdress_t PD_root[], PD_Dir1[];
-// root entry
+
 // @formatter:off
-const LC_ParameterAdress_t PD_root[]
-//		DIRECTORY_ARRAY					DIR_INDEX	ENTRY_INDEX	NU		NU		NU			RdTYPE=dir	DIR_NAME				NU(notUsed)
-= { 	{ (void*) &PD_root, 				0, 			0, 		0, 		0, 		0, 			PT_dir, 	"Some awesome device", 	0 }, //Directory entry
-		{ (void*) &PD_Dir1, 				1, 			0, 		0,		0, 		0, 			PT_dir, 	0, 						0 }, //entrance to other directory, no need to define name here
-//pti macro used for picking data type, supported standard types only
-//		ADRESS									MIN		MAX		STEP	DECIMAL		RdTYPE					NAME			FORMATTING
-		{ pti(UserConfig.Parameter1, 			0, 		0, 		0, 		0),		 	PT_value | PT_readonly, "Shutdown time", "%s sec" }, //
-		{ pti(UserConfig.Parameter2, 			6000, 	100000, 100, 	3), 		PT_value, 				"Maximum voltage", "%sV" }, //
+const LCPS_Entry_t PD_Root[]
+= {		folder(LCP_AccessLvl_Any, 		1, 		0, 0 ),
+		pstd(LCP_AccessLvl_Any, 	LCP_ReadOnly,	UserConfig.Parameter1,			((LCP_Uint32_t){0, 	0, 	0}),				"Shutdown time", "%s sec"),
+		pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Parameter2,			((LCP_Decimal32_t){6000, 100000, 100, 3}), 	"Maximum voltage", "%sV"),
 };
 
-const LC_ParameterAdress_t PD_Dir1[]
-//[0]=PARENT_ADDRESS				PARENT_INDEX	ENTRY_INDEX	NU		NU		NU			RdTYPE=dir	DIR_NAME		NU
-= { { (void*) &PD_root, 			0, 				0, 			0, 		0, 		0,			 PT_dir, 	"Directory One", 0 }, //Directory entry
-//		ADRESS									MIN		MAX		STEP	DECIMAL		RdTYPE					NAME			FORMATTING
-		{ pti(UserConfig.Throttle.EnumParam, 	0, 		1, 		1, 		0), 		PT_enum, 				"Mode", "Off\nActive\nPassive" }, //
-		{ pti(UserConfig.Throttle.Min, 			0, 		5000,	10, 	3), 		PT_value, 				"Min mV", 0 }, //
-		{ pti(UserConfig.Throttle.Max, 			0, 		5000, 	10, 	3), 		PT_value, 				"Max mV", 0 }, //
+const LCPS_Entry_t PD_Dir1[]
+= { 	pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Throttle.EnumParam,	((LCP_Enum_t){0, 3}),					"Mode", "Off\nActive\nPassive"),
+		pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Throttle.Min,		((LCP_Decimal32_t){0, 5000, 10, 3}), 	"Min mV", 0),
+		pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Throttle.Max,		((LCP_Decimal32_t){0, 5000, 10, 3}), 	"Max mV", 0),
 };
 // @formatter:on
-//all directories stored here
-const LC_ParameterDirectory_t paramDirectories[] = { DIRDEF(PD_root), DIRDEF(PD_Dir1) };
-//and it's size
-const uint32_t paramDirectoriesSize = sizeof(paramDirectories) / sizeof(paramDirectories[0]);
 
+//all directories stored here
+const LCPS_Directory_t pDirectories[] = {
+directory(PD_Root, 0, LCP_AccessLvl_Any, "DeviceName"),
+directory(PD_Dir1, 0, LCP_AccessLvl_Any, "Directory 1") };
+//and it's size
+const uint32_t paramDirectoriesSize = sizeof(pDirectories) / sizeof(pDirectories[0]);
+
+LC_NodeDescriptor_t node_data;
 LC_NodeDescriptor_t *mynode;
+//functions to call CAN driver
+const LC_DriverCalls_t nodeDrv = { LC_HAL_Send, LC_HAL_CreateFilterMasks, LC_HAL_TxHalfFull };
 
 void nwrk_manager(void *pvParameters);
 #ifdef LEVCAN_USE_RTOS_QUEUE
@@ -99,35 +97,39 @@ void Init_LEVCAN(void) {
 	 Initialize your HAL, ports and system clocks. LEVCAN running on 1Mbit, 2 SJW, 87% sample point.
 	 Online calculator http://www.bittiming.can-wiki.info/, you can use included HAL function:
 	 */
+	//Replace this function with your custom CAN initialization code
 	CAN_InitFromClock(RCC_APB1_CLK, 1000, 2, 87); //default CAN speed 1Mhz, sample 87%, sjw=2
 
 	//At this point you should have working CAN and should be set interrupts for rx/tx buffer.
 	//Let's create LEVCAN node initialization structure:
-	LC_NodeDescriptor_t *node_desc;
-	LC_InitNodeDescriptor(&node_desc);
 
-	node_desc->DeviceName = "Some Awesome Device";
-	node_desc->NodeName = "Awesome Device Node"; //visible in device list from lcd
-	node_desc->VendorName = "CompanyName LLC.";
+	mynode = &node_data;
+	LC_InitNodeDescriptor(mynode);
+	mynode->Driver = &nodeDrv;
+
+	LCP_ParameterServerInit(mynode); //Init parameters server
+
+	mynode->DeviceName = "Some Awesome Device";
+	mynode->NodeName = "Awesome Device Node"; //visible in device list from lcd
+	mynode->VendorName = "CompanyName LLC.";
 
 	//Put your unique device codes
-	node_desc->ShortName.ManufacturerCode = 0x1BC;
-	node_desc->ShortName.NodeID = 31; //default used ID if free
-	node_desc->Serial = 0xDEADBEEF; //use your unique SN
-	node_desc->ShortName.DeviceType = LC_Device_Controller; //Setup device type, used for parsing devices over CAN bus
+	mynode->ShortName.ManufacturerCode = 0x1BC;
+	mynode->ShortName.NodeID = 31; //default used ID if free
+	mynode->Serial[0] = 0xDEADBEEF; //use your unique SN
+	mynode->ShortName.DeviceType = LC_Device_Controller; //Setup device type, used for parsing devices over CAN bus
+	mynode->ShortName.CodePage = 1250; //default node encoding, win1250
 
 	//assing node objects and its size
-	node_desc->Objects = (void*) node_obj;
-	node_desc->ObjectsSize = node_obj_size;
+	mynode->Objects = (void*) node_obj;
+	mynode->ObjectsSize = node_obj_size;
 
 	//since we have configuration for our device, set configurable bit and assign parameters
-	node_desc->ShortName.Configurable = 1; // we have configurable variables (LC_ParameterDirectory_t)
-	node_desc->Directories = (void*) paramDirectories;
-	node_desc->DirectoriesSize = paramDirectoriesSize;
+	mynode->Directories = (void*) pDirectories;
+	mynode->DirectoriesSize = paramDirectoriesSize;
 
 	//create node
-	LC_CreateNode(node_desc);
-	mynode = node_desc;
+	LC_CreateNode(mynode);
 
 	//run network manager task, basically it updates at 100-1000hz rate
 	xTaskCreate(nwrk_manager, "LC", configMINIMAL_STACK_SIZE, NULL, OS_PRIORITY_LOW, (TaskHandle_t*) NULL);
@@ -147,10 +149,9 @@ void nwrk_manager(void *pvParameters) {
 	const int updrate = 1000;
 #endif
 	while (1) {
-		LC_NetworkManager(configTICK_RATE_HZ / 1000);
+		LC_NetworkManager(mynode, configTICK_RATE_HZ / 1000);
 #ifndef LEVCAN_USE_RTOS_QUEUE
-		LC_ReceiveManager();
-		LC_TransmitManager();
+		LC_ReceiveManager(mynode);
 #endif
 		static uint32_t prev_upd_time_sp = 0;
 		vTaskDelayUntil(&prev_upd_time_sp, configTICK_RATE_HZ / updrate); //100hz CAN
@@ -162,13 +163,6 @@ void can_RXmanager(void *pvParameters) {
 	(void) pvParameters;
 	while (1) {
 		LC_ReceiveManager();
-	}
-}
-
-void can_TXmanager(void *pvParameters) {
-	(void) pvParameters;
-	while (1) {
-		LC_TransmitManager();
 	}
 }
 #endif

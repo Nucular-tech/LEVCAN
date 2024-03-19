@@ -41,7 +41,7 @@ static inline void lc_disable_irq(void) {
 #define LEVCAN_FILE_TIMEOUT 500
 
 //define to be able to configure your device over levcan
-#define LEVCAN_PARAMETERS
+#define LEVCAN_PARAMETERS_SERVER
 //define to be able print and parse your parameters
 #define LEVCAN_PARAMETERS_PARSING
 //Float-point support for parameters
