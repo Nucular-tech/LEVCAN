@@ -100,6 +100,8 @@ void proceedFileClient(LC_NodeDescriptor_t *node, LC_Header_t header, void *data
 /// @param server_node Server id, can be LC_Broadcast_Address to find first one
 /// @return LC_FileResult_t
 LC_FileResult_t LC_FileOpen(LC_NodeDescriptor_t *node, char *name, LC_FileAccess_t mode, uint8_t server_node) {
+	if (node == 0)
+		return LC_FR_NodeOffline;
 	//look for any server node
 	if (server_node == LC_Broadcast_Address)
 		server_node = LC_FindFileServer(node, 0).NodeID;
@@ -131,6 +133,8 @@ LC_FileResult_t LC_FileOpen(LC_NodeDescriptor_t *node, char *name, LC_FileAccess
 /// @param sender_node Own network node
 /// @return LC_FileResult_t
 LC_FileResult_t LC_FileRead(LC_NodeDescriptor_t *node, char *buffer, uint32_t btr, uint32_t *br) {
+	if (node == 0)
+		return LC_FR_NodeOffline;
 	uint16_t attempt;
 	LC_NodeShortName_t server;
 
@@ -263,6 +267,8 @@ void processReceivedData(volatile fRead_t *rxtoread, fOpData_t *opdata, int32_t 
 /// @param sender_node Own network node
 /// @return LC_FileResult_t
 LC_FileResult_t LC_FileWrite(LC_NodeDescriptor_t *node, const char *buffer, uint32_t btw, uint32_t *bw) {
+	if (node == 0)
+		return LC_FR_NodeOffline;
 	LC_FileResult_t ret = LC_FR_Ok;
 	if (bw == 0 || buffer == 0)
 		return LC_FR_InvalidParameter;

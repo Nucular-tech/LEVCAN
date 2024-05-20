@@ -63,6 +63,7 @@ typedef enum {
 	LC_Obj_PowerModeIndex,
 	LC_Obj_BatteryCurrents,
 	LC_Obj_BatteryVoltages,
+	LC_Obj_ControlDirection,
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -120,6 +121,10 @@ typedef struct {
 	uint16_t BrakeFactor; //100...10000
 	uint16_t ThrottleFactor; //100...10000
 } LC_Obj_ControlFactorInt_t;
+
+typedef struct {
+	uint8_t Invert; //0 - normal, 1 - invert
+} LC_Obj_ControlDirection_t;
 
 typedef struct {
 	union {
