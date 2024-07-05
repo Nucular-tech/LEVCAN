@@ -4,6 +4,8 @@
 #pragma once
 
 #include "levcan_filedef.h"
+#include "levcan_paramserver.h"
+
 
 typedef struct {
 #ifdef LEVCAN_PARAMETERS_CLIENT
@@ -12,6 +14,7 @@ typedef struct {
 #endif
 #ifdef LEVCAN_PARAMETERS_SERVER
 	uint8_t paramServerLastAccessNodeId;
+	lc_param_callback_t paramCallback;
 #endif
 #ifdef LEVCAN_FILECLIENT
 	uint8_t fnode;
@@ -34,6 +37,7 @@ extern lc_Extensions_t lc_ExtensionsStatic[LEVCAN_MAX_OWN_NODES];
 #endif
 
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
+
 
 #define LEVCAN_COMM_TIMEOUT 100
 //message should be 3x time more than communication

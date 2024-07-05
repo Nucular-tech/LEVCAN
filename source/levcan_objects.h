@@ -129,33 +129,33 @@ typedef struct {
 typedef struct {
 	union {
 		struct {
-			unsigned int Enable :1; //0
-			unsigned int Brake :1; //1
-			unsigned int Lock :1; //2
-			unsigned int Reverse :1; //3
-			unsigned int Speed :3; //4-6
-			unsigned int Cruise :1; //7
+			uint16_t Enable :1; //0
+			uint16_t Brake :1; //1
+			uint16_t Lock :1; //2
+			uint16_t Reverse :1; //3
+			uint16_t Speed :3; //4-6
+			uint16_t Cruise :1; //7
 		} LEVCAN_PACKED;
 		uint16_t Buttons;
 	};
 	union {
 		struct {
-			unsigned int ExButton1 :1;
-			unsigned int ExButton2 :1;
-			unsigned int ExButton3 :1;
-			unsigned int ExButton4 :1;
-			unsigned int ExButton5 :1;
-			unsigned int ExButton6 :1;
-			unsigned int ExButton7 :1;
-			unsigned int ExButton8 :1;
-			unsigned int ExButton9 :1;
-			unsigned int ExButton10 :1;
-			unsigned int ExButton11 :1;
-			unsigned int ExButton12 :1;
-			unsigned int ExButton13 :1;
-			unsigned int ExButton14 :1;
-			unsigned int ExButton15 :1;
-			unsigned int ExButton16 :1;
+			uint16_t ExButton1 :1;
+			uint16_t ExButton2 :1;
+			uint16_t ExButton3 :1;
+			uint16_t ExButton4 :1;
+			uint16_t ExButton5 :1;
+			uint16_t ExButton6 :1;
+			uint16_t ExButton7 :1;
+			uint16_t ExButton8 :1;
+			uint16_t ExButton9 :1;
+			uint16_t ExButton10 :1;
+			uint16_t ExButton11 :1;
+			uint16_t ExButton12 :1;
+			uint16_t ExButton13 :1;
+			uint16_t ExButton14 :1;
+			uint16_t ExButton15 :1;
+			uint16_t ExButton16 :1;
 		} LEVCAN_PACKED;
 		uint16_t ExtraButtons;
 	};

@@ -58,7 +58,8 @@ typedef struct {
 #define directory(_directory, _arrayIndex, _AccessLvl, _Name  ) \
 	{ _directory, _Name, ARRAYSIZ(_directory), _arrayIndex, _AccessLvl }
 
-LC_EXPORT LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node);
+typedef void (*lc_param_callback_t) (LC_NodeDescriptor_t *node);
+LC_EXPORT LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node, lc_param_callback_t callback);
 LC_EXPORT void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index);
 
 LC_EXPORT const char* LCP_ParseParameterName(LC_NodeDescriptor_t *node, const char *input, int16_t *directory, int16_t *index);

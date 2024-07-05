@@ -24,7 +24,7 @@ static const char* extractEntryName(const LCPS_Directory_t directories[], uint16
 void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex);
 const char* skipspaces(const char *s);
 
-LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
+LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node, lc_param_callback_t callback) {
 	if (node == 0 || node->Extensions == 0)
 		return LC_InitError;
 	//register function call to this object
@@ -39,6 +39,7 @@ LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node) {
 	initObject->MsgID = LC_SYS_ParametersRequest;
 	initObject->Size = -LEVCAN_FILE_DATASIZE; //up to size
 	((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId = LC_Broadcast_Address;
+	((lc_Extensions_t*) node->Extensions)->paramCallback = callback;
 	node->ShortName.Configurable = 1;
 	return LC_Ok;
 }
@@ -82,6 +83,11 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 				sendResponce = 0;
 			} else {
 				status = LC_AccessError;
+			}
+			//Update last access node only for directory request, to avoid access based on value update
+			((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId = sendRec.NodeID;
+			if (((lc_Extensions_t*) node->Extensions)->paramCallback != 0) {
+				((lc_Extensions_t*) node->Extensions)->paramCallback(node);
 			}
 		} else {
 			status = LC_OutOfRange;
