@@ -68,15 +68,16 @@ const LCPS_Entry_t PD_Dir1[]
 		pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Throttle.Min,		((LCP_Decimal32_t){0, 5000, 10, 3}), 	"Min mV", 0),
 		pstd(LCP_AccessLvl_Any, 	LCP_Normal,		UserConfig.Throttle.Max,		((LCP_Decimal32_t){0, 5000, 10, 3}), 	"Max mV", 0),
 };
-// @formatter:on
 
 //all directories stored here
 const LCPS_Directory_t pDirectories[] = {
-directory(PD_Root, 0, LCP_AccessLvl_Any, "DeviceName"),
-directory(PD_Dir1, 0, LCP_AccessLvl_Any, "Directory 1") };
+	directory(PD_Root, 0, LCP_AccessLvl_Any, "DeviceName"),
+	directory(PD_Dir1, 0, LCP_AccessLvl_Any, "Directory 1")
+};
 //and it's size
 const uint32_t paramDirectoriesSize = sizeof(pDirectories) / sizeof(pDirectories[0]);
 
+// @formatter:on
 LC_NodeDescriptor_t node_data;
 LC_NodeDescriptor_t *mynode;
 //functions to call CAN driver
@@ -88,6 +89,11 @@ void can_RXmanager(void *pvParameters);
 void can_TXmanager(void *pvParameters);
 #endif
 
+// !! LIMITATIONS !!
+// Device ID should be only 125!
+// Filter uses single filter mask to filter 29b messages
+// In this case easiest to use one mask to filter both broadcast messages and device id=125
+// Driver have hardcoded filter to setup id=125 filter
 void Init_LEVCAN(void) {
 
 	/*
@@ -109,15 +115,16 @@ void Init_LEVCAN(void) {
 	LC_InitNodeDescriptor(mynode);
 	mynode->Driver = &nodeDrv;
 
-	LCP_ParameterServerInit(mynode,0); //Init parameters server
+	LCP_ParameterServerInit(mynode, 0); //Init parameters server
 
-	mynode->DeviceName = "Some Awesome Device";
+	mynode->DeviceName = "ESP LEVCAN Node";
 	mynode->NodeName = "Awesome Device Node"; //visible in device list from lcd
 	mynode->VendorName = "CompanyName LLC.";
 
 	//Put your unique device codes
 	mynode->ShortName.ManufacturerCode = 0x1BC;
-	mynode->ShortName.NodeID = 31; //default used ID if free
+	mynode->ShortName.NodeID = 125; //ESP filter limited to use this node id!
+	mynode->ShortName.DynamicID = 0; //Disable ID change
 	mynode->Serial[0] = 0xDEADBEEF; //use your unique SN
 	mynode->ShortName.DeviceType = LC_Device_Controller; //Setup device type, used for parsing devices over CAN bus
 	mynode->ShortName.CodePage = 1250; //default node encoding, win1250
@@ -174,5 +181,4 @@ void can_TXmanager(void *pvParameters) {
 }
 #endif
 #endif
-
 
