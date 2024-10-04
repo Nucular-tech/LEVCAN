@@ -107,7 +107,7 @@ void Init_LEVCAN(void) {
 	LC_InitNodeDescriptor(mynode);
 	mynode->Driver = &nodeDrv;
 
-	LCP_ParameterServerInit(mynode); //Init parameters server
+	LCP_ParameterServerInit(mynode, 0); //Init parameters server
 
 	mynode->DeviceName = "Some Awesome Device";
 	mynode->NodeName = "Awesome Device Node"; //visible in device list from lcd

@@ -137,6 +137,11 @@ void LC_EventReset(LC_NodeDescriptor_t *node, uint8_t receiver) {
 LC_NodeShortName_t LC_FindEventServer(LC_NodeDescriptor_t *node, uint16_t *scnt) {
 	uint16_t counter = 0;
 	LC_NodeShortName_t nodeSN;
+#ifdef LEVCAN_PARAMETERS_SERVER
+	//send message to source of last parameters request (usually it have GUI and events manager too)
+	if (((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId < LC_Null_Address)
+		return LC_GetNode(node, ((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId);
+#endif
 	if (scnt)
 		counter = *scnt;
 	do {

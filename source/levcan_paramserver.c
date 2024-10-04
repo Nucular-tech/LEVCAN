@@ -24,6 +24,10 @@ static const char* extractEntryName(const LCPS_Directory_t directories[], uint16
 void* getVAddressByIndex(const void *variable0, uint16_t size, uint8_t arrayIndex);
 const char* skipspaces(const char *s);
 
+/// Initialize parameters server
+/// @param node Own node to init
+/// @param callback Called when any parameter requested
+/// @return Initialization status
 LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node, lc_param_callback_t callback) {
 	if (node == 0 || node->Extensions == 0)
 		return LC_InitError;
