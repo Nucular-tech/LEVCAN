@@ -12,6 +12,9 @@
 // include standard levcan objects
 #include "levcan_objects.h"
 
+
+portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
+
 //Example for CAN object setup
 struct {
 	uint32_t Data1;

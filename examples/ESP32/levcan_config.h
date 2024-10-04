@@ -11,17 +11,22 @@
 
 #pragma once
 
+
+#define LC_EVENT_SIZE 368
+
+extern portMUX_TYPE myMutex;
+
 //#define lc_enable_irq() 
 //#define lc_disable_irq() 
 
 //user functions for critical sections
-/*portMUX_TYPE myMutex = portMUX_INITIALIZER_UNLOCKED;
+
 static inline void lc_enable_irq(void) {
 	taskEXIT_CRITICAL(&myMutex);
 }
 static inline void lc_disable_irq(void) {
 	taskENTER_CRITICAL(&myMutex);
-}*/
+}
 //#define LC_EXPORT __declspec(dllexport)
 #define LC_EXPORT
 //Memory packing, compiler specific
