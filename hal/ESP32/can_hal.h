@@ -3,7 +3,7 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  
- TWAI and TWIA_HAL have been modified to work with Levñan by Viktor Sverdlyuk. Access to interrupts is required for operation.
+ TWAI and TWIA_HAL have been modified to work with LEVCAN by Viktor Sverdlyuk. Access to interrupts is required for operation.
  */
 
 

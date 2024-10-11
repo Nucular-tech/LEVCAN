@@ -98,8 +98,8 @@ void Init_LEVCAN(void) {
 
 	/*
 	 First step - clone repo to your PC and connect "LEVCAN\source" folder to your project.
-	 In "LEVCAN\hal" folder you can find standard drivers for specific target
-	 (only STM32 CAN driver available atm.), copy it to your project or make your own driver.
+	 In "LEVCAN\hal" folder you can find standard drivers for specific target,
+	 copy it to your project or make your own driver.
 
 	 Now need to create configuration file for levcan called "levcan_config.h",
 	 you can use example file in "LEVCAN\examples" If you don't use any RTOS you may want to `#define LEVCAN_MEM_STATIC`.
@@ -172,13 +172,5 @@ void can_RXmanager(void *pvParameters) {
 		LC_ReceiveManager(&node_data);
 	}
 }
-#ifndef LEVCAN_NO_TX_QUEUE
-void can_TXmanager(void *pvParameters) {
-	(void) pvParameters;
-	while (1) {
-		LC_TransmitManager(&node_data);
-	}
-}
-#endif
 #endif
 

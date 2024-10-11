@@ -246,10 +246,6 @@ typedef struct {
 		int16_t objectBuffer_freeID;
 #endif
 #ifdef LEVCAN_USE_RTOS_QUEUE
-#ifndef LEVCAN_NO_TX_QUEUE
-		void *txQueue;
-		void *txSemph;
-#endif
 		void *rxQueue;
 #else
 		lc_msgBuffered rxFIFO[LEVCAN_RX_SIZE];

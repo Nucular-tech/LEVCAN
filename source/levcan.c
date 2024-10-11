@@ -141,22 +141,11 @@ LC_Return_t LC_CreateNode(LC_NodeDescriptor_t *node) {
 
 #ifdef LEVCAN_USE_RTOS_QUEUE
 	node->TxRxObjects.rxQueue = LC_QueueCreate(LEVCAN_RX_SIZE, sizeof(lc_msgBuffered));
-#ifndef LEVCAN_NO_TX_QUEUE
-	node->TxRxObjects.txQueue = LC_QueueCreate(LEVCAN_TX_SIZE, sizeof(lc_msgBuffered));
-	node->TxRxObjects.txSemph = LC_SemaphoreCreate();
 
-	if (node->TxRxObjects.rxQueue == NULL || node->TxRxObjects.txQueue == NULL || node->TxRxObjects.txSemph == NULL) {
-		LC_SemaphoreDelete(node->TxRxObjects.txSemph);
-		LC_QueueDelete(node->TxRxObjects.txQueue);
-		LC_QueueDelete(node->TxRxObjects.rxQueue);
-		return LC_MallocFail;
-	}
-#else
 	if (node->TxRxObjects.rxQueue == NULL) {
 		//LC_QueueDelete(node->TxRxObjects.rxQueue);
 		return LC_MallocFail;
 	}
-#endif
 #endif
 
 	node->State = LCNodeState_Disabled;
