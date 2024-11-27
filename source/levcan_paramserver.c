@@ -3,9 +3,10 @@
 
 #include <string.h>
 #include <stdio.h>
-#include <inttypes.h>
+#include <stdint.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
@@ -358,6 +359,8 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		}
 	}
 		break;
+
+#ifdef PRIu64
 	case LCP_Uint64: {
 		uint64_t val_u64 = *(uint64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
@@ -376,6 +379,8 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		}
 	}
 		break;
+#endif
+
 	case LCP_Decimal32: {
 		int32_t val_u32 = lcp_getInt32(getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex), entry->VarSize);
 		int dec = 0;

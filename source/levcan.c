@@ -775,7 +775,7 @@ LC_ObjectRecord_t findObjectRecord(LC_NodeDescriptor_t *node, uint16_t messageID
 						//Group C
 								((record[irec].NodeID == LC_Broadcast_Address) || 			//any match == broadcast
 						(record[irec].NodeID == nodeID))) 							//specific node ID match
-																																																			//@formatter:on
+																																																								//@formatter:on
 					{
 						return record[irec];    //yes
 
@@ -954,8 +954,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 				} else {
 					//check for existing objects, dual request denied
 					//ToDo is this best way? maybe reset tx?
-					lc_objBuffered *txProceed = findObject((void*) node->TxRxObjects.objTXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Source,
-							rxBuffered.header.Target);
+					lc_objBuffered *txProceed = findObject((void*) node->TxRxObjects.objTXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Source, rxBuffered.header.Target);
 					if (txProceed == 0) {
 						obj.Attributes.TCP |= rxBuffered.header.Parity;    //force TCP mode if requested
 						LC_SendMessage(node, &obj, rxBuffered.header.MsgID);
@@ -993,8 +992,7 @@ void LC_ReceiveManager(LC_NodeDescriptor_t *node) {
 					}
 				} else {
 					//find existing RX object, delete in case we get new RequestToSend
-					lc_objBuffered *RXobj = findObject((lc_objBuffered*) node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target,
-							rxBuffered.header.Source);
+					lc_objBuffered *RXobj = findObject((lc_objBuffered*) node->TxRxObjects.objRXbuf_start, rxBuffered.header.MsgID, rxBuffered.header.Target, rxBuffered.header.Source);
 					if (RXobj) {
 						RXobj->FlagsTotal = toDeleteMark; //garbage collector mark
 						//lcfree(RXobj->Pointer);
@@ -1088,9 +1086,12 @@ int16_t LC_GetNodeIndex(LC_NodeDescriptor_t *node, uint16_t nodeID) {
 /// @param n Pointer to stored position for search
 /// @return Returns active node short name
 LC_NodeShortName_t LC_GetActiveNodes(LC_NodeDescriptor_t *node, uint16_t *last_pos) {
+	const LC_NodeShortName_t broadcast = (LC_NodeShortName_t ) { .NodeID = LC_Broadcast_Address };
 	int i = *last_pos;
 	//new run
-	if (node == 0 || *last_pos >= LEVCAN_MAX_TABLE_NODES)
+	if (node == 0 || last_pos == 0)
+		return broadcast;
+	if (*last_pos >= LEVCAN_MAX_TABLE_NODES)
 		i = 0;
 	LC_NodeTableEntry_t *node_table = node->NodeTable->Table;
 	//search
@@ -1101,8 +1102,7 @@ LC_NodeShortName_t LC_GetActiveNodes(LC_NodeDescriptor_t *node, uint16_t *last_p
 		}
 	}
 	*last_pos = LEVCAN_MAX_TABLE_NODES;
-	LC_NodeShortName_t ret = (LC_NodeShortName_t ) { .NodeID = LC_Broadcast_Address };
-	return ret;
+	return broadcast;
 }
 
 /// Returns own node short name, containing actual ID
