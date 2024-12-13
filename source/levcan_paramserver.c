@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include "levcan_paramserver.h"
 #include "levcan_paraminternal.h"
@@ -451,7 +452,10 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 
 #ifdef LEVCAN_USE_FLOAT
 	case LCP_Float: {
-		float fval = *(float*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		float *fvalref = getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
+		float fval = NAN;
+		if (fvalref != 0)
+			fval = *fvalref;
 		if (entry->TextData) {
 			sprintf(buffer + strlen(buffer), entry->TextData, fval);
 		} else {
@@ -775,7 +779,8 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 		}
 
 		LCP_Float_t *desc = (LCP_Float_t*) parameter->Descriptor;
-		*((float*) vaddress) = f32;
+		if (vaddress != 0)
+			*((float*) vaddress) = f32;
 		result = lcp_f32inRange(vaddress, varsize, desc->Min, desc->Max);
 	}
 		break;

@@ -15,8 +15,6 @@ int16_t lc_compareNodes(LC_NodeShortName_t a, LC_NodeShortName_t b);
 uint16_t lc_searchIndexCollision(LC_NodeDescriptor_t *node, uint16_t nodeID);
 void lc_claimFreeID(LC_NodeDescriptor_t *node);
 LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t *node, uint16_t target);
-
-extern LC_Return_t lc_sendDataToQueue(LC_NodeDescriptor_t *node, LC_HeaderPacked_t hdr, uint32_t data[], uint8_t length);
 //### Private variables
 
 LC_RemoteNodeCallback_t lc_addressCallback = 0;

@@ -29,9 +29,7 @@ enum {
 
 //EXTERN FUNCTIONS
 extern void LC_ReceiveHandler(LC_NodeDescriptor_t *node, LC_HeaderPacked_t header, uint32_t *data, uint8_t length);
-#ifdef TRACE
-extern int trace_printf(const char *format, ...);
-#endif
+
 
 //PRIVATE FUNCTIONS
 uint8_t _getFreeTX();
