@@ -17,7 +17,10 @@
 #ifndef LEVCAN_PARAMETERS_SERVER
 #error "Define LEVCAN_PARAMETERS_SERVER in \"levcan_config.h\"!"
 #endif
-
+//Define  lc_strtof to replace standard function (to avoid double conversion for example)
+#ifndef lc_strtof
+#define lc_strtof strtof
+#endif
 //Private functions
 void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, void *data, int32_t size);
 extern LC_Object_t* lc_registerSystemObjects(LC_NodeDescriptor_t *node, uint8_t count);
@@ -361,7 +364,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 	}
 		break;
 
-#ifdef PRIu64
+#ifdef LEVCAN_USE_INT64
 	case LCP_Uint64: {
 		uint64_t val_u64 = *(uint64_t*) getVAddressByIndex(entry->Variable, entry->VarSize, dir->ArrayIndex);
 		if (entry->TextData) {
@@ -457,9 +460,21 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 		if (fvalref != 0)
 			fval = *fvalref;
 		if (entry->TextData) {
+#ifndef LEVCAN_USE_FLOAT_AS_INT_HACK
 			sprintf(buffer + strlen(buffer), entry->TextData, fval);
+#else
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+			sprintf(buffer + strlen(buffer), entry->TextData, *((int32_t*)&fval));
+#pragma GCC diagnostic pop
+#endif
 		} else {
+#ifndef LEVCAN_USE_FLOAT_AS_INT_HACK
 			sprintf(buffer + strlen(buffer), "%.9f", fval);
+#else
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+			sprintf(buffer + strlen(buffer), "%.9f", *((int32_t*)&fval));
+#pragma GCC diagnostic pop
+#endif
 		}
 	}
 		break;
@@ -699,7 +714,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 #endif
 	case LCP_Decimal32: {
 #ifdef LEVCAN_USE_FLOAT
-		float temp = strtof(s, out);
+		float temp = lc_strtof(s, out);
 		if (s == *out) {
 			result = LC_DataError;
 			break;
@@ -768,7 +783,7 @@ LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, const uint8_t
 
 #ifdef LEVCAN_USE_FLOAT
 	case LCP_Float: {
-		float f32 = strtof(s, out);
+		float f32 = lc_strtof(s, out);
 		if (s == *out) {
 			result = LC_DataError;
 			break;

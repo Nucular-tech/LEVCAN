@@ -59,7 +59,6 @@ extern LC_Return_t lc_sendDiscoveryRequest(LC_NodeDescriptor_t *node, uint16_t t
 //#### FUNCTIONS
 
 LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
-	static int init = 0;
 	if (node == 0)
 		return LC_ObjectError;
 	//clean up
@@ -114,7 +113,6 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 	node->TxRxObjects.rxFIFO_out = 0;
 	memset(node->TxRxObjects.rxFIFO, 0, sizeof(node->TxRxObjects.rxFIFO));
 #endif // !LEVCAN_USE_RTOS_QUEUE
-	init++;
 	return LC_Ok;
 }
 
