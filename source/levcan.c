@@ -89,8 +89,9 @@ LC_Return_t LC_InitNodeDescriptor(LC_NodeDescriptor_t *node) {
 	if (sizeof(LC_NodeTableEntry_t[LEVCAN_MAX_TABLE_NODES]) > 0 && node->NodeTable->Table == 0)
 		return LC_MallocFail;
 #else  // LEVCAN_MEM_STATIC
+	static int init = 0;
 	//todo add overflow check
-	node->Extensions = &lc_ExtensionsStatic[init];
+	node->Extensions = &lc_ExtensionsStatic[init++];
 	node->NodeTable = &node->NodeTableStatic;
 	node->NodeTable->Table = &node->NodeTableEntryStatic[0];
 
