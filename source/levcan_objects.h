@@ -18,12 +18,12 @@ typedef enum {
 	LC_Device_Debug = 0x80,
 	LC_Device_reserved2 = 0x100,
 	LC_Device_reserved3 = 0x200,
-} LC_Device_t;
+} LC_Device_t; //ShortName.DeviceType 10 bit
 
 typedef enum {
 	LC_Obj_State = 0x300,
-	LC_Obj_DCSupply,
-	LC_Obj_MotorSupply,
+	LC_Obj_DCSupply, 		// Controller battery power input, LC_Obj_Supply_t (positive - consumption, negative - regeneration)
+	LC_Obj_MotorSupply, 	// motor power from controller, LC_Obj_Supply_t
 	LC_Obj_InternalVoltage,
 	LC_Obj_Power,
 	LC_Obj_Temperature,
@@ -49,21 +49,27 @@ typedef enum {
 	LC_Obj_AccelerometerRaw,
 	LC_Obj_Accelerometer,
 	LC_Obj_ControlFactorInt,
-	LC_Obj_DCLimitIFactor,
+	LC_Obj_DCLimitIFactor,	// LC_Obj_DCLimit_t
 	LC_Obj_DCLimitIValue,
 	LC_Obj_DCLimitVValue,
-	LC_Obj_FOCstateV,
-	LC_Obj_FOCstateI,
-	LC_Obj_FOCreqest,
-	LC_Obj_AhUsed,
-	LC_Obj_AhStored,
+	LC_Obj_FOCstateV,		// LC_Obj_FOCstateV_t
+	LC_Obj_FOCstateI,		// LC_Obj_FOCstateI_t
+	LC_Obj_FOCreqest,		// LC_Obj_FOCrequest_t
+	LC_Obj_AhUsed,			// LC_Obj_AhUsed_t
+	LC_Obj_AhStored,		// LC_Obj_AhStored_t
+	LC_Obj_BatterySupply, 	// BMS or battery supply, LC_Obj_Supply_t (negative - battery discharge)
+	LC_Obj_AuxSupply, 		// 12V systems or other low voltage equipment, LC_Obj_Supply_t (positive - consumption, negative - regeneration)
+	LC_Obj_ClimateSupply, 	// Climate control systems supply, LC_Obj_Supply_t (positive - consumption, negative - regeneration)
+	LC_Obj_ACSupply, 		// 110V/220V AC grid supply, LC_Obj_Supply_t
+	LC_Obj_ACSupply3Ph, 	// 110V/220V AC grid 3 phase supply, LC_Obj_Supply3ph_t
 	LC_Obj_CFactor_Internal,
 	LC_Obj_CFactorInt_Internal,
-	LC_Obj_SelectedPowerMode,
-	LC_Obj_PowerModeIndex,
+	LC_Obj_SelectedPowerMode,// LC_Obj_PowerMode_t
+	LC_Obj_PowerModeIndex,	// LC_Obj_PowerMode_t
 	LC_Obj_BatteryCurrents,
 	LC_Obj_BatteryVoltages,
 	LC_Obj_ControlDirection,
+	LC_Obj_PowerModeLimits,	// LC_Obj_PowerMode_t with maximum values. index = 0
 } LC_Obj_Std_t;
 
 typedef struct {
@@ -118,9 +124,20 @@ typedef struct {
 } LC_Obj_ControlFactor_t;
 
 typedef struct {
+	float ControlFactor; //positive - throttle, negative - brake, range: -1...1
+	uint16_t Group;
+} LC_Obj_ControlFactorGroup_t;
+
+typedef struct {
 	uint16_t BrakeFactor; //100...10000
 	uint16_t ThrottleFactor; //100...10000
 } LC_Obj_ControlFactorInt_t;
+
+typedef struct {
+	uint16_t BrakeFactor; //100...10000
+	uint16_t ThrottleFactor; //100...10000
+	uint16_t Group;
+} LC_Obj_ControlFactorIntGroup_t;
 
 typedef struct {
 	uint8_t Invert; //0 - normal, 1 - invert
@@ -161,6 +178,42 @@ typedef struct {
 	};
 } LC_Obj_Buttons_t;
 
+typedef struct {
+	union {
+		struct {
+			uint16_t Enable :1; //0
+			uint16_t Brake :1; //1
+			uint16_t Lock :1; //2
+			uint16_t Reverse :1; //3
+			uint16_t Speed :3; //4-6
+			uint16_t Cruise :1; //7
+		} LEVCAN_PACKED;
+		uint16_t Buttons;
+	};
+	union {
+		struct {
+			uint16_t ExButton1 :1;
+			uint16_t ExButton2 :1;
+			uint16_t ExButton3 :1;
+			uint16_t ExButton4 :1;
+			uint16_t ExButton5 :1;
+			uint16_t ExButton6 :1;
+			uint16_t ExButton7 :1;
+			uint16_t ExButton8 :1;
+			uint16_t ExButton9 :1;
+			uint16_t ExButton10 :1;
+			uint16_t ExButton11 :1;
+			uint16_t ExButton12 :1;
+			uint16_t ExButton13 :1;
+			uint16_t ExButton14 :1;
+			uint16_t ExButton15 :1;
+			uint16_t ExButton16 :1;
+		} LEVCAN_PACKED;
+		uint16_t ExtraButtons;
+	};
+	uint16_t Group;
+} LC_Obj_ButtonsGroup_t;
+
 typedef union {
 	struct {
 		unsigned int Enable :1;
@@ -193,6 +246,7 @@ typedef union {
 		unsigned int Service :1; //29
 		unsigned int FanActive :1; //30
 		unsigned int BatteryHeater :1; //31
+		unsigned int WalkMode :1; //32
 	} LEVCAN_PACKED;
 	uint32_t Functions[2];
 } LC_Obj_ActiveFunctions_t;
