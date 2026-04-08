@@ -74,7 +74,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 			LCPS_Directory_t *directory = &(directories[request.Directory]);
 			//current access should be same or higher
 			//header "not exists" if there is no access to it
-			if (node->AccessLevel >= directory->AccessLvl) {
+			if (node->AccessLevel & directory->AccessLvl) {
 				//this fits in one can message, so gonna be placed in a buffer
 				lc_directory_data_t dirdata;
 				dirdata.EntrySize = directory->Size;
@@ -113,8 +113,8 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 			LCPS_Entry_t *entry = (void*) &directory->Entries[request.Entry];
 			//current access should be same or higher
 			//header "not exists" if there is no access to it
-			if (node->AccessLevel >= directory->AccessLvl) {
-				if (node->AccessLevel >= entry->AccessLvl) {
+			if (node->AccessLevel & directory->AccessLvl) {
+				if (node->AccessLevel & entry->AccessLvl) {
 					/*if (entry->Function) {
 					 if (entry->Variable != 0) {
 					 //get parameter from function
@@ -227,7 +227,7 @@ void lc_proceedParameterRequest(LC_NodeDescriptor_t *node, LC_Header_t header, v
 			LCPS_Directory_t *directory = &(directories[request->DirectoryIndex]);
 			LCPS_Entry_t *entry = (void*) &directory->Entries[request->EntryIndex];
 			int varsize = size - sizeof(lc_value_set_t);
-			if ((node->AccessLevel >= directory->AccessLvl) && (node->AccessLevel >= entry->AccessLvl)) {
+			if ((node->AccessLevel & directory->AccessLvl) && (node->AccessLevel & entry->AccessLvl)) {
 				//size should match
 				if (varsize == entry->VarSize && entry->Variable != 0) {
 					//align data
@@ -464,7 +464,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 			sprintf(buffer + strlen(buffer), entry->TextData, fval);
 #else
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-			sprintf(buffer + strlen(buffer), entry->TextData, *((int32_t*)&fval));
+			sprintf(buffer + strlen(buffer), entry->TextData, *((int32_t*) &fval));
 #pragma GCC diagnostic pop
 #endif
 		} else {
@@ -472,7 +472,7 @@ void LCP_PrintParam(char *buffer, const LCPS_Directory_t *dir, uint16_t index) {
 			sprintf(buffer + strlen(buffer), "%.9f", fval);
 #else
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
-			sprintf(buffer + strlen(buffer), "%.9f", *((int32_t*)&fval));
+			sprintf(buffer + strlen(buffer), "%.9f", *((int32_t*) &fval));
 #pragma GCC diagnostic pop
 #endif
 		}
@@ -831,6 +831,12 @@ uint8_t LCP_GetLastAccessNodeID(LC_NodeDescriptor_t *node) {
 	if (node != 0 && node->Extensions != 0)
 		return ((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId;
 	return LC_Broadcast_Address;
+}
+
+void LCP_SetLastAccessNodeID(LC_NodeDescriptor_t *node, uint8_t id) {
+	if (node != 0 && node->Extensions != 0)
+		((lc_Extensions_t*) node->Extensions)->paramServerLastAccessNodeId = id;
+	return;
 }
 
 const char* skipspaces(const char *s) {

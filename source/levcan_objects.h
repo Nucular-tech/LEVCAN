@@ -70,6 +70,8 @@ typedef enum {
 	LC_Obj_BatteryVoltages,
 	LC_Obj_ControlDirection,
 	LC_Obj_PowerModeLimits,	// LC_Obj_PowerMode_t with maximum values. index = 0
+	LC_Obj_ParametersSave,	//send uint8_t for index
+	LC_Obj_ParametersLoad,	//send uint8_t for index
 } LC_Obj_Std_t;
 
 typedef struct {

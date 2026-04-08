@@ -16,18 +16,17 @@ typedef struct {
 	const char *TextData; //null terminated
 	uint16_t VarSize; //in bytes, OR directory index
 	uint16_t DescSize; //in bytes
+	uint16_t AccessLvl; //LCP_AccessLvl_t
 	uint8_t EntryType; //LCP_Type_t
-	uint8_t AccessLvl; //LCP_AccessLvl_t
 	uint8_t Mode; //LCP_Mode_t
-	uint8_t reserved;
 } LCPS_Entry_t;
 
 typedef struct {
 	const LCPS_Entry_t *Entries;
 	const char *Name; //null terminated
 	uint16_t Size;
+	uint16_t AccessLvl; //LCP_AccessLvl_t
 	uint8_t ArrayIndex;
-	uint8_t AccessLvl; //LCP_AccessLvl_t
 } LCPS_Directory_t;
 
 #define standardTypes(_val)  _Generic((_val),		\
@@ -42,21 +41,21 @@ typedef struct {
 		LCP_Bitfield32_t: LCP_Bitfield32)
 
 #define pstd( _AccessLvl, _Mode, _Var, _Desc, _Name, _Text) \
-	{ (void*)&_Var, (void*)&_Desc, _Name, _Text,  sizeof(_Var), sizeof(_Desc), standardTypes(_Desc), _AccessLvl, _Mode, 0}
+	{ (void*)&_Var, (void*)&_Desc, _Name, _Text,  sizeof(_Var), sizeof(_Desc), _AccessLvl, standardTypes(_Desc), _Mode}
 
 #define pbool( _AccessLvl, _Mode, _Var, _Name, _Text) \
-	{(void*)&_Var, 0, _Name, _Text,  sizeof(_Var), 0, LCP_Bool, _AccessLvl, _Mode, 0}
+	{(void*)&_Var, 0, _Name, _Text,  sizeof(_Var), 0, _AccessLvl, LCP_Bool, _Mode}
 
 #define label( _AccessLvl, _Mode, _Name, _Text) \
-	{ 0, 0, _Name, _Text,  0, 0, LCP_Label, _AccessLvl, _Mode, 0}
+	{ 0, 0, _Name, _Text,  0, 0, _AccessLvl, LCP_Label, _Mode}
 
 #define folder( _AccessLvl, _DirIndex, _Name, _Text) \
-	{0, 0,  _Name, _Text, _DirIndex, 0, LCP_Folder, _AccessLvl, 0, 0}
+	{0, 0,  _Name, _Text, _DirIndex, 0, _AccessLvl, LCP_Folder, 0}
 
 #define ARRAYSIZ(array) (sizeof(array)/sizeof(array[0]))
 
 #define directory(_directory, _arrayIndex, _AccessLvl, _Name  ) \
-	{ _directory, _Name, ARRAYSIZ(_directory), _arrayIndex, _AccessLvl }
+	{ _directory, _Name, ARRAYSIZ(_directory), _AccessLvl, _arrayIndex }
 
 typedef void (*lc_param_callback_t) (LC_NodeDescriptor_t *node);
 LC_EXPORT LC_Return_t LCP_ParameterServerInit(LC_NodeDescriptor_t *node, lc_param_callback_t callback);
@@ -67,3 +66,4 @@ LC_EXPORT LC_Return_t LCP_ParseParameterValue(const LCPS_Entry_t *parameter, con
 LC_EXPORT int16_t LCP_IsDirectory(const LCPS_Directory_t directories[], uint16_t dirsize, const char *s);
 LC_EXPORT int16_t LCP_IsParameter(const LCPS_Directory_t *directory, const char *s);
 LC_EXPORT uint8_t LCP_GetLastAccessNodeID(LC_NodeDescriptor_t *node);
+LC_EXPORT void LCP_SetLastAccessNodeID(LC_NodeDescriptor_t *node, uint8_t id);

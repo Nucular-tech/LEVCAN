@@ -237,8 +237,8 @@ typedef struct {
 	uint16_t SystemSize;
 	uint16_t DirectoriesSize;
 	uint16_t LastID;
+	uint16_t AccessLevel;
 	uint8_t State;
-	uint8_t AccessLevel;
 	//not for public use
 	struct {
 #ifdef LEVCAN_MEM_STATIC

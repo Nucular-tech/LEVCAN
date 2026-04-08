@@ -6,9 +6,9 @@
 typedef enum {
 	LCP_AccessLvl_Any = 0, //
 	LCP_AccessLvl_User = 2, //
-	LCP_AccessLvl_Service = 5, //
-	LCP_AccessLvl_Dev = 7, //
-} LCP_AccessLvl_t; //3 bit
+	LCP_AccessLvl_Service = 8, //
+	LCP_AccessLvl_Dev = (uint16_t)INT16_MAX+1, //
+} LCP_AccessLvl_t; //16 bit
 
 typedef enum {
 	LCP_Normal = 0, 			//RW
